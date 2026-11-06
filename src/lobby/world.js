@@ -24,6 +24,7 @@ const PALETTE = {
 const EXTRA_TAPES = [
   {
     title: 'Copper Line',
+    show: 'copper-line', // own show (songs/copper/show.js); the audio stays the shared song id
     preview: { start: 20.1, end: 47.7 },
     label: { paper: '#e6dac0', ink: '#141920', accent: '#a86428', foil: '#e0a527', stripe: '#a86428', catalog: 'DD-002' },
   },
@@ -74,12 +75,14 @@ export class World {
       const base = songs[0];
       for (let i = 0; tapeSpecs.length < this.caseObj.slotPoses.length && i < EXTRA_TAPES.length; i++) {
         const ex = EXTRA_TAPES[i];
-        tapeSpecs.push({
+        const spec = {
           ...base,
           title: ex.title,
           preview: ex.preview,
           label: ex.label,
-        });
+        };
+        if (ex.show) spec.show = ex.show;
+        tapeSpecs.push(spec);
       }
     }
 

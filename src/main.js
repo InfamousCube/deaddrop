@@ -476,7 +476,8 @@ function beginReturn(reason) {
   world.deck.state.spinTarget = -2.5; // rewind
   if (G.tape) G.tape.spin = -6;
   world.room.scheduleWires(-20, -19, 9); // all seams drawn
-  G.retDur = G.retFrom.breakU > 0.05 ? 2.8 : 1.2;
+  // a show that rebuilds the room itself (onReturn) can ask for its own duration
+  G.retDur = G.show?.returnDur ?? (G.retFrom.breakU > 0.05 ? 2.8 : 1.2);
   setState('return');
 }
 
