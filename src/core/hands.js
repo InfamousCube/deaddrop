@@ -112,7 +112,7 @@ export class HandModel {
     const pos = g.attributes.position, nor = g.attributes.normal;
     const cnt = pos.count;
     const ca = new Float32Array(cnt * 3), ea = new Float32Array(cnt * 4);
-    const leather = new THREE.Color(0x1f1a17), palm = new THREE.Color(0x171310), seam = new THREE.Color(0x5a3a22);
+    const leather = new THREE.Color(0x2b2420), palm = new THREE.Color(0x1d1815), seam = new THREE.Color(0x5a3a22);
     const wrist = this.restP[0];
     // palm side (normal along the palm normal) a touch darker; a brown welt seam around the wrist opening
     const n0 = this._palmNormal(this.restP, new THREE.Vector3());
