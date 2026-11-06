@@ -1,0 +1,31 @@
+{
+  "name": "Dead Drop",
+  "short_name": "Dead Drop",
+  "start_url": "./?autoxr=1",
+  "display": "standalone",
+  "display_override": [
+    "immersive",
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "landscape",
+  "background_color": "#07060a",
+  "theme_color": "#07060a",
+  "description": "A spy-fi listening station in VR: pick a tape, drop it in, and the song takes the room.",
+  "id": "./",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

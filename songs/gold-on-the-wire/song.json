@@ -1,0 +1,59 @@
+{
+ "id": "gold-on-the-wire",
+ "title": "Gold on the Wire",
+ "artist": "MistyConifer",
+ "duration": "2:34",
+ "length": 153.771,
+ "audio": "audio.mp3",
+ "bpm": 105.74,
+ "preview": {
+  "start": 122.33,
+  "end": 151.3
+ },
+ "label": {
+  "paper": "#efe3c4",
+  "ink": "#0d0c10",
+  "accent": "#b3121b",
+  "foil": "#d9a93a",
+  "stripe": "#d9a93a",
+  "catalog": "DD-001"
+ },
+ "sections": [
+  {
+   "start": 0.0,
+   "end": 20.09,
+   "energy": 0.57,
+   "label": "mid"
+  },
+  {
+   "start": 20.09,
+   "end": 47.73,
+   "energy": 0.449,
+   "label": "mid"
+  },
+  {
+   "start": 47.73,
+   "end": 112.09,
+   "energy": 0.586,
+   "label": "high"
+  },
+  {
+   "start": 112.09,
+   "end": 125.9,
+   "energy": 0.372,
+   "label": "low"
+  },
+  {
+   "start": 127.64,
+   "end": 150.0,
+   "energy": 0.692,
+   "label": "high"
+  },
+  {
+   "start": 150.0,
+   "end": 153.77,
+   "energy": 0.027,
+   "label": "low"
+  }
+ ]
+}
