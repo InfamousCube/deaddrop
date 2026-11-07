@@ -1,6 +1,6 @@
 # DD-003 "black-box": API for scene builders
 
-This is the show for the song **Gold on the Wire** (MistyConifer) on tape DD-003. Never write "Black Box" anywhere in the show. The plan is in `STORYBOARD.md`, and every scene below follows it.
+This is the show for the song **Gold on the Wire** (MistyConifer) on tape DD-003. Never write "Black Box" anywhere in the show. The first plan is in `STORYBOARD.md`. After Leo's feedback (07.11.: "far too much happens", "no desk, nothing in front of me") every scene was reworked into one clean IEYTD-style shot: the **shot card in the header of each scene file is the source of truth** where it differs from the storyboard. Read **Clarity rules** below before you add anything.
 
 You edit only your own `scenes-N.js`. The foundation files are `show.js`, `style.js`, `rig.js`, `type.js`, `fx.js` and `kit.js`. If you think a foundation file needs a change, say so; don't fork it.
 
@@ -8,12 +8,12 @@ You edit only your own `scenes-N.js`. The foundation files are `show.js`, `style
 
 | file | content |
 |---|---|
-| `show.js` | Scene manager: picks the scene that owns t; sets the world (ramp, rim, fog, key, sky); runs the cradle and flashes; handles the lobby dissolve and return; prebuilds while the tape is held. |
+| `show.js` | Scene manager: picks the scene that owns t; sets the world (ramp, rim, fog, key, sky); computes the rig state (never drawn) and runs the flashes; handles the lobby dissolve and return; prebuilds while the tape is held. |
 | `style.js` | `PAL`, `RAMPS`, `WORLDS`, the shared uniforms `U`, `toon()`, `flat()`, the sunburst dome, `mulberry()`, `flatShade()`. |
-| `rig.js` | The cradle (deck, railing, hanger, trolley, console gauge, gold wire), `RIG` constants, and `travel()` speed profiles. |
+| `rig.js` | `RIG` constants and `travel()` speed profiles. It still builds the old cradle (deck, railing, hanger, gold wire), but `show.js` never adds it to the scene: **nothing travels with the player**. |
 | `type.js` | Glyph-atlas typography (`makeText`), the `words.json` index (`match` / `times` / `line`). |
 | `fx.js` | `particles`, `shards`, `matte` (portal), `edges` (edge-mode), and the helpers `sm`, `lightsOut`, `passBy`, `envAfter`, `fadeK`. |
-| `kit.js` | `saltFlat()` (S01 + S18), `placeholder()`, `mergeSimple()`. |
+| `kit.js` | `saltFlat()` (S18; S01 now has its own 2 pairs of giant T-poles), `placeholder()`, `mergeSimple()`. |
 | `scenes-1.js` .. `scenes-4.js` | Default export: an array of scene objects (group 1 = S01-S05, 2 = S06-S09, 3 = S10-S13, 4 = S14-S18). |
 
 Imports inside a scene file:
@@ -28,12 +28,16 @@ import { PAL } from './style.js';   // anything else comes through `kit`
 All in metres, world space = rig space.
 
 - The player stands where the desk was. Their eyes are at about `(0, 1.6, 0.05)`.
-- `-z` is forward along the wire, `+x` is right, `+y` is up.
-- The cradle deck's top is at `y = 0.012`, radius 0.9. The railing is at `y = 1.0` (r 0.85). The wire is at `y = RIG.wireY = 3.4` and runs from `z = -290` to `+290`.
-- **The cradle never moves.** Travel means moving your world: put everything in a group and set `group.position.z = +distance`, using `kit.travel(...)`.
-- Keep everything at least 0.5 m from the eyes. Main action goes in the front 120°, but populate the sides, back and up.
-- No forced camera motion. The world may rotate slowly (2-6°/s), mostly in the periphery.
-- Comfort flag: `COMFORT` from `style.js` (URL `?comfort=1` or localStorage `dd.comfort` = `1`, read once at load). S06 caps its drop at 7 instead of 10 m/s and S07 halves and shrinks its shard burst. Headless renders: `node tools/showshots.mjs tape=2 q=comfort=1`.
+- `-z` is forward, `+x` is right, `+y` is up.
+- **The player floats freely in each world.** There is no deck, railing, gondola, console, hanger rod or wire around them (Leo, 07.11.: "no desk, no control panel, nothing in front of you"). Never add anything that travels with the player, in the lower or the upper view. `RIG.wireY` (3.4) is only a height reference now.
+- **The player never moves.** Travel means moving your world: put everything in a group and set `group.position.z = +distance`, using `kit.travel(...)`.
+- Comfort without a cockpit (there is no frame around the player any more):
+  - cruising speed at most 4 m/s, vertical at most 2 m/s, smooth eases (`kit.travel` eases 1 s or more);
+  - no forced camera motion; large structures around the player rotate at most 3°/s; a floor that opens or slides under the player moves at most about 3 m/s (S06 split: 2.9 m/s); no rings or sweeps racing out across the floor from under the player (S06 tick ring and S10 board sweep removed 07.11.); a far hero object drifts at most about 3-4 deg/s (S07 airship: 110 m out, 4 m/s);
+  - nothing closer than 1.5 m to the eyes; shards and bursts fly away from the player;
+  - every world has a readable ground or horizon below or ahead, so the player does not feel like falling.
+- Main action goes in the front ±35°. Sides, back and up may be calm (IEYTD is calm there too), but not empty: one big silhouette or the world colour is enough.
+- Comfort flag: `COMFORT` from `style.js` (URL `?comfort=1` or localStorage `dd.comfort` = `1`, read once at load). Only S07 still uses it (9 instead of 16 shards); the old falls and shard storms are gone. Headless renders: `node tools/showshots.mjs tape=2 q=comfort=1`.
 
 ## Scene object
 
@@ -58,9 +62,10 @@ All in metres, world space = rig space.
 - **Warm-up**: right after `build`, the manager calls `update` once at t0 + 0.05, the middle and t1 - 0.05 while the group is hidden (`kit.isOwner` false, scratch `rigState`), then compiles the group, so lazily created state (`instanceColor` via `setColorAt`) gets its shader program before the first visible frame. Owner-only calls must stay behind `kit.isOwner`.
 - **`update(t, s, kit)`** is called every frame while `t0 - pre <= t < t1 + post`. Outside that window the group is hidden and update is not called.
 - **Everything must be a pure function of t.** No accumulating state, no `dt`. Seeking ±10 s, scrubbing backwards and the return can happen at any frame. Compute positions from t (`kit.travel(...).d(t)`, `kit.sm`, beat times), never from the previous frame.
-- **The owner** is the scene with `t0 <= t < t1`; `kit.isOwner` is true only there. Only the owner may touch the sky (`kit.setSky`, `kit.sky`), the cradle (`kit.rigState`) and the world blend (`kit.setWorld`). A scene in its `pre`/`post` overlap only draws its own group.
+- **The owner** is the scene with `t0 <= t < t1`; `kit.isOwner` is true only there. Only the owner may touch the sky (`kit.setSky`, `kit.sky`), the rig state (`kit.rigState`, not drawn) and the world blend (`kit.setWorld`). A scene in its `pre`/`post` overlap only draws its own group.
 - **Every frame, before update**, the manager resets for each active scene: the world uniforms, the sky (to the owner's preset), `kit.SU.uSceneFade = 1`, `kit.SU.uEdge = 0`, the rig state, and all text reveals (these update automatically). So set what you need every frame.
-- **Return to the lobby** (B/Y held, the watch, or the song's end) is handled by `show.js`. It freezes the last t and fades the global `U.uFade` to 0 over 0.85 s (`returnDur` 1.2), then hides everything. The lobby (room, desk, case, phone, tapes) is hidden from 0.05-1.15 s and comes back 151.8-153.6 s (`L.hideLobby`, in `show.js`). **Never touch the lobby** or `world.*` from a scene.
+- **`pre` / `post`**: content of the incoming scene that is visible before its `t0` is drawn over the outgoing world. Keep `pre: 0` unless a portal, matte or match-cut needs it, and then keep the pre-visible part away from the outgoing scene's hero and lyric (S06, S08 and S09 were set to `pre: 0` for this).
+- **Return to the lobby** (B/Y held, the watch, or the song's end) is handled by `show.js`. It freezes the last t and fades the global `U.uFade` to 0 over 0.85 s (`returnDur` 1.2), then hides everything. The lobby (room, desk, case, phone, tapes) breaks apart 0.05-0.7 s (`LOBBY_GONE` in `show.js`; fast, so no debris hangs behind the first title), is hidden for the whole song and comes back 151.8-153.6 s (`L.hideLobby`, in `show.js`). **Never touch the lobby** or `world.*` from a scene.
 
 ## The kit (second argument of build/update)
 
@@ -100,7 +105,9 @@ All in metres, world space = rig space.
 - `T.words[i]` gives `{ x0, x1, y0, y1 }` in local metres, for glueing things to a word.
 - `T.redact(i, t)` slams a black bar with a white spark edge over word i at time t (every "why").
 - `T.hideWord(i, t)` hides word i from t on.
-- `depthTest: false` draws the line over everything in front of it (signs that set pieces pass between).
+- `depthTest: false` draws the line over everything in front of it (signs that set pieces pass between). Use it for lines that sit low over a floor or plain: otherwise the ground plane clips the lower line.
+- `vAlign: 'bottom'` puts the last line's baseline at `at.y` and grows the block upward (a 2-line block over a floor never dips into it); `'top'` hangs it below `at.y`, `'baseline'` puts the first baseline there, `'middle'` (default) centres it.
+- Size: a Bebas line is about `0.49 x cap` metres wide per character. Glyphs on black count as clarity *specks* unless `cap / d` is about 0.15 or more, so keep a line at 12 characters or fewer and split a long phrase into 2 short lines or 2 sequential blocks.
 - To glue text to a surface, pass `parent: someMesh` and set `T.mesh.position/rotation` in that mesh's space.
 - The font is Bebas Neue (`web/fonts`, OFL) with an italic slant of 0.2, caps only. Glyphs: `A-Z 0-9 . , ' ! ? - : & / " ( ) + % #`.
 
@@ -147,15 +154,9 @@ All in metres, world space = rig space.
 **Fog** (owner only): `kit.setFog(color, near, far)` overrides the scene's fog for this frame (call it every frame; S11 underwater).
 
 **World blend** (owner only)
-- `kit.setWorld('hot', k)` blends the `'world'` ramp, rim, fog colour and cradle colours from your `world` to another by k. Use it for S10 (cold to hot on "light"), S16 (amber to hot) and S17 (hot to amber at ignition).
+- `kit.setWorld('hot', k)` blends the `'world'` ramp, rim and fog colour from your `world` to another by k. Use it for S10 (cold to hot on "light"), S16 (amber to hot) and S17 (hot to amber at ignition).
 
-**Cradle** (owner only): `kit.rigState`, already filled with defaults each frame:
-- `dark` (0..1): dims the railing and hanger, for lights-out;
-- `vis`: 1 during the song, and the deck fades out at 152.8;
-- `gauge` (0..1): the needle, defaulting to a downbeat kick; set 1 to slam it;
-- `lampOn`;
-- `wheelSpin`: set it to `prof.d(t) / 0.075` so the wheels roll with your travel;
-- `wire: { on (0..1), lenF (m drawn ahead), lenB (behind), pulses: [{ z, a, w }] }`. The global "gold on the wire" pulses are pre-filled; push your own pulses or replace the list. Set `wire.on = 0` and `wire.pulses = []` to hide the wire and draw your own (S11, S18).
+**Rig state (not drawn)** (owner only): `kit.rigState` is still filled each frame (`dark`, `vis`, `gauge`, `lampOn`, `wheelSpin`, `wire: { on, lenF, lenB, pulses }`, plus `worldB` / `mix` from `setWorld`), so older scene code that writes it keeps working. **None of it has a visible effect**: the cradle, the gold wire and the global "gold on the wire" pulses (`WIRE_PULSES` in `show.js`) are not in the scene. If a scene needs a wire, a gauge or a lamp, it builds its own, out in the world (S08's gold wire, S12's high wire, S13's cord).
 
 **Shared set piece.** `kit.saltFlat({ gap, spacing, count, height })` returns `{ group, update(t, d, bulbFn) }`: the black ground plus T-pole rows (2 draw calls + ground). `bulbFn(i, side, z)` returns a colour hex, or null for off.
 
@@ -169,11 +170,37 @@ Keep them sparse (about 1 per 2-4 s). The song is the soundtrack. `haptic: [stre
 
 ## Performance rules (Quest 3, standalone)
 
-- At peak, per eye: about 150 draw calls and 200k triangles **for the whole frame**. The cradle, dome and texts take about 15 calls; your owner scene gets about 60-90 calls, plus about 40 for the scene in its `pre`/`post` overlap.
+- At peak, per eye: about 150 draw calls and 200k triangles **for the whole frame**. The dome and the texts take about 5-10 calls; your owner scene gets about 60-90 calls, plus about 40 for the scene in its `pre`/`post` overlap. After the clean rework the whole show peaks at about 32 calls and 15k triangles per eye (headless stills).
 - Use one InstancedMesh per repeated object type and merge static geometry (`kit.js` `mergeSimple`, or `BufferGeometryUtils` from `three/addons/utils/BufferGeometryUtils.js`). Keep faces low-poly (flat faceted look).
 - No lights, shadows, textures (except the glyph atlas), post-processing, transparency stacks or full-screen overdraw.
 - Update instance matrices only for what moves. Never allocate in `update` (keep temp vectors in the state).
 - Never flash the whole view faster than 3 Hz. Colour flashes last 0.03 s.
+
+## Clarity rules (Leo, 07.11.: "far too much happens", compare the real IEYTD 3 intro)
+
+Reference stills: `reference/ieytd3-samples/*.png`, `reference/ieytd3-intro-frames.png`. Every scene is ONE clear shot (or 2-3 clear beats in sequence) with a shot card in its file header: hero subject, at most 2 supporting elements, palette, the one main motion, where the lyric sits.
+
+- **One hero** per shot (a mask, a zero, a car, a bomb, a dial). Everything else is big dark silhouette framing or empty black. A second hero waits until the first has left (S07: the airship goes down before the angel rises).
+- **2-3 flat colours** per shot: black + one field colour + one accent. About half the frame is black, as shadow shapes, not noise.
+- **Big chunky shapes.** No thin lines, wires, grids or wireframes (make them chunky bands that read at distance), no swarms of small instances. Repetition is a few large ordered silhouettes, not hundreds of small things.
+- **One main motion at a time**, slow and readable. Particles only as one short accent per scene (sparks once). Sunburst rays only on a few chorus hits, never as permanent wallpaper.
+- **Lyrics:** one phrase visible at a time (one block, at most 2 short lines), big, in calm space within about +-35 deg of forward, on the `words.json` times, and gone (`out`) before the next phrase appears. Never on top of busy shapes or the hero, never scattered in several places, no credit-size text. A display that belongs to the hero (S08's timer digits, S13's dial hub) may stay next to the lyric.
+- Prefer deleting, enlarging and merging over adding.
+
+**The check** (`tools/clarity.py`) measures each frame against the IEYTD stills: `edges` (share of hard colour-edge pixels: thin lines, grids, rows of small things), `specks` (tiny separate shapes), `colours`, `black` share and `busy` (combined).
+- Per frame: edges <= 0.095, specks <= 26, colours <= 8, busy <= 19.8.
+- Whole show: median edges <= 0.056, median busy <= 12.4, median black >= 0.38.
+- Frames before 0.7 s (lobby break) and from 151.8 s (lobby rebuild) are not show frames; leave them out.
+- Numbers are not enough: also look at the frames next to the IEYTD stills and ask "can I tell in half a second what this shot is about?"
+
+```
+node tools/showshots.mjs tape=2 port=5825 frames=1 times=0.8,3.8,6.8 views=fwd out=tools/shots/blackbox/clean/full fov=95 w=420 cols=6
+python tools/clarity.py --quiet tools/shots/blackbox/clean/full/frames --json tools/shots/blackbox/clean/full/clarity.json
+```
+
+- `fov=95` is the **vertical** field of view (about 125 deg horizontal at 16:9), and the forward view is pitched -7 deg, so a still spans roughly -54 to +40 deg elevation. Heroes and text look smaller there than on the Quest.
+- Black beats: only two designed ones (S06 "hold your breath" 42.76-47.5 and S15 "lights out" 124.9-127.6), and both keep a faint ground (S06 petrol floor, S15 funnel rim). Every other shot has a field colour behind its hero.
+- Last full check (07.11., after the review fixes, 51 forward frames every 3 s from 0.8 s): median edges 0.035, busy 3.6, black 0.52; 0 frames over a per-frame limit. Sheets in `tools/shots/blackbox/clean/final/` (360 views: `clean/full360/`).
 
 ## Testing (silent, headless; never open windows or play sound)
 
@@ -183,7 +210,8 @@ node tools/xrtest.mjs        # must end ALL PASS
 ```
 
 - `tape=2` is DD-003 (the index is 0-based).
-- Use a different `port` per builder (group 1: 5811, 2: 5812, 3: 5813, 4: 5814).
+- Use a different `port` per parallel render (group 1: 5811, 2: 5812, 3: 5813, 4: 5814, integration 5825-5828). `node tools/xrtest.mjs` uses a fixed port: run one instance at a time.
+- `frames=1` also writes every still as a PNG to `<out>/frames/` for `clarity.py`.
 - The sheet prints draw calls and triangles per still (one eye, 1280x720).
 
 ## Minimal example scene

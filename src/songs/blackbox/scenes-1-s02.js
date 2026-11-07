@@ -1,12 +1,24 @@
-// S02 The Nixie Hall (9.18 to 16.00, hot). Twelve 16 m Nixie tubes ring the player; the countdown
-// lands on "zero". Out: PORTAL (the front tube's gold 0 slides down the wire and passes the eyes ~15.8;
-// S03 shows only through it via kit.matte from 15.4).
+// S02 The Nixie Hall (9.18 to 16.00, hot).
+// SHOT CARD
+//   hero     one giant gold zero (an 8 m oval ring) floating straight ahead in the black
+//   supports a ring of 6 big Nixie tubes (22 m, crimson caps, 20 m out; the front two at +-34 deg frame
+//            the zero), each showing ONE big digit; the black dome with a crimson horizon band behind them
+//   palette  black (tubes as silhouettes, floor, upper dome) + crimson field (horizon band, caps) + gold (digits, zero)
+//   motion   9.48 everything slams on "zero" -> 10.46 the ring tubes scramble, 11.82 they go dark ->
+//            12.80 the zero glides down to eye height and toward the player -> 13.75 the tubes relight
+//            clockwise -> 14.56 the dome opens -> PORTAL: the player passes through the zero (15.8)
+//   lyrics   one block at a time under the zero (d 6.5, below the eye line, in the calm forward gap):
+//            COUNT DOWN TO / ZERO, DON'T ASK / ME WHY (redacted), GOLD ON / THE WIRE, TONIGHT
+//   removed  the stacked dark digits in every tube, the front tube, the 400 stars, the hanging rod,
+//            the ring yaw, 6 of the 12 tubes; 07.11. review: tubes x1.6 and 20 m out (was 30 m, 95% black frames),
+//            the crimson band moved from the zenith down to the horizon (one field colour behind the silhouettes)
 import * as THREE from 'three';
 import { PAL } from './style.js';
 import { mergeSimple } from './kit.js';
 import { scratch } from './scenes-1-util.js';
+import { COUNT_LAYOUT } from './scenes-1-s01.js';
 
-const FLOOR_Y = -2.6, R_RING = 22;
+const FLOOR_Y = -2.6, R_RING = 20, NT = 6, TUBE_AZ = [34, 90, 146, 214, 270, 326], TUBE_S = [1.6, 1.4, 1.6], ZERO_Z = -26, ZERO_Y = 7.5, ZERO_R = 5;
 // digit polylines in a unit box (x -0.5..0.5, y 0..1); arcs as point runs
 const arc = (cx, cy, rx, ry, a0, a1, n = 10) => Array.from({ length: n + 1 }, (_, i) => { const a = a0 + ((a1 - a0) * i) / n; return [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]; });
 const P = Math.PI;
@@ -29,7 +41,7 @@ function digitGeo(k, h, r) {
     for (let i = 0; i + 1 < line.length; i++) {
       a.set(line[i][0] * h * 0.62, line[i][1] * h - h / 2, 0); b.set(line[i + 1][0] * h * 0.62, line[i + 1][1] * h - h / 2, 0);
       const L = a.distanceTo(b); if (L < 1e-4) continue;
-      const c = new THREE.CylinderGeometry(r, r, L + r * 1.2, 5, 1, true);
+      const c = new THREE.CylinderGeometry(r, r, L + r * 1.2, 6, 1, true);
       dir.subVectors(b, a).normalize(); q.setFromUnitVectors(up, dir); mid.addVectors(a, b).multiplyScalar(0.5);
       c.applyQuaternion(q); c.translate(mid.x, mid.y, mid.z);
       parts.push(c);
@@ -42,27 +54,22 @@ const hash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
 export const S02 = {
   id: 'S02', t0: 9.18, t1: 16.0, world: 'hot', pre: 0, post: 0,
   key: [0.2, 0.6, 0.77], sky: 'black',
-  fog: { color: PAL.velvet, near: 26, far: 120 },
+  fog: { color: PAL.velvet, near: 40, far: 150 },
   build(kit) {
     const s = { x: scratch() };
-    s.x.m2 = new THREE.Matrix4();
-    s.prof = kit.travel([[9.18, 0.8, 1.0], [15.0, 5, 1.0]]);
-    s.z0 = -22.2 + s.prof.d(12.8);
+    s.prof = kit.travel([[9.18, 0.8, 1.0], [15.0, 4, 1.0]]);
     s.hall = new THREE.Group(); kit.group.add(s.hall);
-    s.ringG = new THREE.Group(); s.hall.add(s.ringG);
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 40).rotateX(-Math.PI / 2), kit.flat({ color: PAL.black }));
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(44, 40).rotateX(-Math.PI / 2), kit.flat({ color: PAL.black }));
     floor.position.y = FLOOR_Y; s.hall.add(floor); s.floor = floor;
-    // gold flash ring on the floor at r 22 (one frame on "zero")
-    s.flashRing = new THREE.Mesh(new THREE.RingGeometry(R_RING - 0.5, R_RING + 0.5, 64).rotateX(-Math.PI / 2), kit.flat({ color: PAL.gold, fog: 0 }));
+    // gold flash ring on the floor under the tubes (one frame on "zero")
+    s.flashRing = new THREE.Mesh(new THREE.RingGeometry(R_RING - 1, R_RING + 1, 64).rotateX(-Math.PI / 2), kit.flat({ color: PAL.gold, fog: 0 }));
     s.flashRing.position.y = FLOOR_Y + 0.02; s.hall.add(s.flashRing);
-    // dome: 8 petals (black, a crimson ring near the top), folding outward on "tonight"
-    const RD = 26, pet = [];
-    for (let i = 0; i < 6; i++) { const e0 = (i / 6) * (P / 2), e1 = ((i + 1) / 6) * (P / 2); pet.push([e0, e1]); }
-    const pos = [], col = [];
+    // dome: 8 petals (black, one crimson band near the top), folding outward on "tonight"
+    const RD = 38, pos = [], col = [];
     const pt = (el, az) => [RD * Math.cos(el) * Math.sin(az), RD * Math.sin(el), -RD * Math.cos(el) * Math.cos(az) + RD];
-    const rows = [0, 0.35, 0.7, 1.0, 1.22, 1.3, 1.36, 1.42, P / 2 - 0.02];
+    const rows = [0, 0.5, 0.9, 1.25, P / 2 - 0.02];
     for (let r = 0; r + 1 < rows.length; r++) {
-      const red = r === 5;
+      const red = r === 0; // crimson horizon band (about -6 to +23 deg from the eye): the tubes read as black silhouettes on it
       for (let j = 0; j < 4; j++) {
         const a0 = -P / 8 + (j / 4) * (P / 4), a1 = -P / 8 + ((j + 1) / 4) * (P / 4);
         const A = pt(rows[r], a0), B = pt(rows[r], a1), C = pt(rows[r + 1], a1), D = pt(rows[r + 1], a0);
@@ -81,148 +88,91 @@ export const S02 = {
       piv.add(new THREE.Mesh(pg, pMat));
       hold.add(piv); s.hall.add(hold); s.petals.push(piv);
     }
-    // tubes: 12 ring + 1 front (bigger). Body = inside of an open cylinder (dark backdrop, cream rim)
+    // 6 tubes (TUBE_AZ; the forward +-22 deg stay free for the zero and the lyrics)
     s.bodyMat = kit.toon({ ramp: 'black', rim: PAL.cream, rimTh: 0.45, side: THREE.BackSide });
-    const body = new THREE.CylinderGeometry(2, 2, 16, 18, 1, true).translate(0, 8, 0);
-    s.bodies = new THREE.InstancedMesh(body, s.bodyMat, 13);
-    const capG = mergeSimple([new THREE.CylinderGeometry(2.25, 2.25, 1.0, 18).translate(0, 0.5, 0), new THREE.CylinderGeometry(1.0, 2.25, 0.8, 18).translate(0, 16.4, 0), new THREE.CylinderGeometry(2.25, 2.25, 0.6, 18).translate(0, 15.7, 0)]);
-    s.caps = new THREE.InstancedMesh(capG, kit.toon({ ramp: 'hot', rim: PAL.gold }), 13);
-    s.tubeM = [];
+    const body = new THREE.CylinderGeometry(2.2, 2.2, 16, 18, 1, true).translate(0, 8, 0);
+    s.bodies = new THREE.InstancedMesh(body, s.bodyMat, NT);
+    const capG = mergeSimple([new THREE.CylinderGeometry(2.5, 2.5, 1.2, 18).translate(0, 0.6, 0), new THREE.CylinderGeometry(1.1, 2.5, 0.9, 18).translate(0, 16.5, 0), new THREE.CylinderGeometry(2.5, 2.5, 0.7, 18).translate(0, 15.7, 0)]);
+    s.caps = new THREE.InstancedMesh(capG, kit.toon({ ramp: 'hot', rim: PAL.gold }), NT);
+    s.tubeM = []; s.tubeA = [];
     const m = s.x.m, q = s.x.q, p = s.x.p, sc = s.x.s;
-    for (let k = 0; k < 13; k++) {
-      const front = k === 12;
-      const a = front ? 0 : ((k + 0.5) / 12) * P * 2;
-      const r = front ? 24 : R_RING;
-      p.set(Math.sin(a) * r, FLOOR_Y, -Math.cos(a) * r); q.setFromAxisAngle(s.x.v.set(0, 1, 0), -a);
-      sc.set(front ? 1.5 : 1, front ? 22 / 16 : 1, front ? 1.5 : 1);
-      m.compose(p, q, sc); s.tubeM.push(m.clone());
+    for (let k = 0; k < NT; k++) {
+      const a = (TUBE_AZ[k] * P) / 180;
+      p.set(Math.sin(a) * R_RING, FLOOR_Y, -Math.cos(a) * R_RING); q.setFromAxisAngle(s.x.v.set(0, 1, 0), -a); sc.set(TUBE_S[0], TUBE_S[1], TUBE_S[2]);
+      m.compose(p, q, sc); s.tubeM.push(m.clone()); s.tubeA.push(a);
       s.bodies.setMatrixAt(k, m); s.caps.setMatrixAt(k, m);
     }
-    s.tubes = new THREE.Group();
-    s.tubes.add(s.bodies, s.caps);
-    // digits: one InstancedMesh per numeral, 13 instances (one per tube), stacked front to back
-    s.digits = []; s.frontDM = []; s.dM = []; s.zeroM = new THREE.Matrix4().makeScale(0, 0, 0);
-    const dm = kit.flat({ color: PAL.white, fog: 0.7 });
+    s.tubes = new THREE.Group(); s.tubes.add(s.bodies, s.caps); s.hall.add(s.tubes);
+    // digits: one InstancedMesh per numeral, one instance per tube; only the shown numeral is drawn
+    s.digits = []; s.dM = []; s.zeroM = new THREE.Matrix4().makeScale(0, 0, 0);
+    s.digitMat = kit.flat({ color: PAL.gold, fog: 0.5 });
     for (let dgt = 0; dgt < 10; dgt++) {
-      const im = new THREE.InstancedMesh(digitGeo(dgt, 3.5, 0.075), dm, 13);
-      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(13 * 3), 3);
-      for (let k = 0; k < 13; k++) {
-        const front = k === 12;
-        const local = new THREE.Matrix4().makeTranslation(0, front ? (1.8 - FLOOR_Y) / 1.375 : 4 - FLOOR_Y, 1.2 - dgt * 0.12);
-        if (front) local.multiply(new THREE.Matrix4().makeScale(8 / 3.5 / 1.5, 8 / 3.5 / 1.375, 1));
-        const L = s.tubeM[k].clone().multiply(local);
-        im.setMatrixAt(k, L);
-        (s.dM[dgt] ||= [])[k] = L;
-        if (front) s.frontDM.push(L);
-      }
+      const im = new THREE.InstancedMesh(digitGeo(dgt, 6, 0.24), s.digitMat, NT);
+      s.dM[dgt] = [];
+      for (let k = 0; k < NT; k++) { const L = s.tubeM[k].clone().multiply(new THREE.Matrix4().makeTranslation(0, 7.6, 0.9)); s.dM[dgt].push(L); im.setMatrixAt(k, s.zeroM); }
+      im.frustumCulled = false;
       s.digits.push(im); s.tubes.add(im);
     }
-    s.ringG.add(s.tubes); // the ring yaws slowly; instance 12 (front tube) is counter-rotated each frame
-    // the big zero ring (8 m), detaches on "Gold" and slides down the wire through the player
+    // THE ZERO: an 8 m gold oval floating ahead; detaches on "Gold" and comes to the player (PORTAL)
     s.zero = new THREE.Group(); kit.group.add(s.zero);
-    s.zeroMesh = new THREE.Mesh(new THREE.TorusGeometry(4, 0.17, 6, 48), kit.flat({ color: PAL.gold, fog: 0.3 }));
+    s.zeroMat = kit.flat({ color: PAL.gold, fog: 0.3 });
+    s.zeroMesh = new THREE.Mesh(new THREE.TorusGeometry(ZERO_R, 0.9, 8, 48), s.zeroMat);
     s.zero.add(s.zeroMesh);
-    s.matte = kit.matte({ shape: 'circle', r: 3.86 });
+    s.matte = kit.matte({ shape: 'circle', r: ZERO_R - 0.7 });
     s.matte.position.z = -0.05;
     s.zero.add(s.matte);
-    // stars (folded-open sky)
-    s.stars = kit.particles({ n: 400, shape: 'disc', fog: 0, opacity: 0.999, seed: 7, init: (i, r) => {
-      const az = r() * P * 2, el = 0.06 + Math.asin(r()) * 0.98;
-      return { p: [Math.cos(el) * Math.sin(az) * 180, Math.sin(el) * 180, -Math.cos(el) * Math.cos(az) * 180], s: 0.35 + r() * 0.55, c: r() < 0.15 ? PAL.cream : PAL.white };
-    } });
-    kit.group.add(s.stars);
-    // the hanging rod for GOLD ON THE WIRE
-    // ---- type ----
-    s.countT = kit.text('COUNT DOWN TO', { cap: 0.62, color: 'gold', tracking: 0.08, times: [9.2, 9.2, 9.3], out: 10.46, at: { d: 6, az: 0, y: 3.2 } });
-    s.zeroT = kit.text('ZERO', { cap: 1.6, color: 'gold', times: 9.48, pop: true, dur: 0.1, out: 10.46, outDur: 0.05, at: { d: 6, az: 0, y: 1.6 } });
-    s.why = kit.text("DON'T ASK ME WHY", { cap: 0.95, color: 'cream', near: 10.46, out: 12.7, at: { d: 6, az: 22, y: 1.8 } });
+    // ---- type: one block at a time, under the zero, in the free forward gap ----
+    const L2 = COUNT_LAYOUT;
+    s.countT = kit.text('COUNT DOWN TO\nZERO', { ...L2, color: 'gold', colors: { 3: 'cream' }, times: [9.18, 9.18, 9.3, 9.48], out: 10.3, outDur: 0.15 });
+    s.why = kit.text("DON'T ASK\nME WHY", { ...L2, color: 'cream', near: 10.46, out: 12.6, outDur: 0.2 });
     s.why.redact(3, 11.82);
-    s.goldG = new THREE.Group(); kit.place(s.goldG, { d: 7, az: 0, y: 2.62 }); kit.group.add(s.goldG);
-    s.goldT = kit.text('GOLD ON THE WIRE', { cap: 1.05, color: 'gold', vAlign: 'top', times: [12.8, 13.62, 13.84, 14.02], out: 15.35, parent: s.goldG });
-    const strings = [new THREE.BoxGeometry(6.6, 0.05, 0.05).translate(0, 0.62, 0)];
-    for (const w of s.goldT.words) strings.push(new THREE.BoxGeometry(0.025, 0.62, 0.025).translate((w.x0 + w.x1) / 2, 0.31, 0));
-    s.rod = new THREE.Mesh(mergeSimple(strings), kit.flat({ color: PAL.brass }));
-    s.goldG.add(s.rod);
-    s.tonight = kit.text('TONIGHT', { cap: 1.0, color: 'cream', near: 14.56, pop: true, out: 15.55, at: { d: 7, az: 15, y: 3.45 } });
+    s.goldT = kit.text('GOLD ON\nTHE WIRE', { ...L2, color: 'gold', times: [12.8, 13.62, 13.84, 14.02], out: 14.4, outDur: 0.15 });
+    s.tonight = kit.text('TONIGHT', { ...L2, cap: 1.15, color: 'cream', near: 14.56, pop: true, out: 15.4, outDur: 0.15 });
     return s;
   },
   update(t, s, kit) {
     const { sm } = kit;
     const d = s.prof.d(t);
     s.hall.position.z = d;
-    s.ringG.rotation.y = (t - 9.18) * 0.105;
     const lit = t >= 9.48;
-    const zkP = Math.min(1, Math.max(0, (t - 12.8) / 3.0)), zzP = s.z0 + (0.05 - s.z0) * zkP * zkP;
-    // which numeral each tube shows (-1 = dark)
+    // the zero: ahead at eye+4 m; 12.80 "Gold" -> glides down to eye height and passes the eyes at ~15.8
+    const zk = Math.min(1, Math.max(0, (t - 12.8) / 3.0));
+    let zz = ZERO_Z + (0.05 - ZERO_Z) * zk * zk;
+    if (t > 15.8) zz = 0.05 + (t - 15.8) * 16;
+    s.zero.visible = t < 16.0;
+    s.zero.position.set(0, ZERO_Y + (1.6 - ZERO_Y) * sm(12.8, 15.4, t), zz);
+    s.zeroMesh.scale.set(0.62 + 0.38 * sm(14.4, 15.4, t), 1, 1); // oval numeral -> round portal
+    s.zeroMat.uniforms.uBright.value = lit ? 1 + 0.8 * (t < 9.62 ? 1 : 0) : 0.2;
+    s.matte.visible = t >= 15.4 && zz < 0.0;
+    // which numeral each ring tube shows (-1 = dark)
     const ringDigit = (k) => {
       if (!lit) return -1;
       if (t < 10.46) return 0;
       if (t < 11.47) return Math.floor(hash(k, Math.floor((t - 10.46) * 6)) * 10);
       if (t < 11.82) return Math.floor(hash(k, 99) * 10);
-      // relight clockwise from the front-right, 0.08 s apart, on the 13.75 downbeat
-      return t >= 13.75 + 0.08 * k ? 0 : -1;
+      return t >= 13.75 + 0.1 * k ? 0 : -1; // relight clockwise on the 13.75 downbeat
     };
-    const frontDigit = lit && t < 12.8 ? 0 : -1;
-    const c = s.x.c;
-    for (let dg = 0; dg < 10; dg++) {
-      const im = s.digits[dg];
-      for (let k = 0; k < 13; k++) {
-        const v = k === 12 ? frontDigit : ringDigit(k);
-        if (v === dg) c.setHex(PAL.gold); else c.setHex(k === 12 && t >= 12.8 && dg === 0 ? 0x000000 : PAL.brassDark);
-        if (!lit) c.multiplyScalar(0.35);
-        im.setColorAt(k, c);
-      }
-      im.instanceColor.needsUpdate = true;
-    }
-    // the front tube stays put while the ring yaws: counter-rotate its instance by re-setting it
-    // (tube bodies/caps of instance 12 use the ring group's rotation, so undo it)
-    s.x.m.makeRotationY(-s.ringG.rotation.y).multiply(s.tubeM[12]);
-    s.bodies.setMatrixAt(12, s.x.m); s.caps.setMatrixAt(12, s.x.m);
-    s.bodies.instanceMatrix.needsUpdate = true; s.caps.instanceMatrix.needsUpdate = true;
-    for (let dg = 0; dg < 10; dg++) { s.x.m2.makeRotationY(-s.ringG.rotation.y).multiply(s.frontDM[dg]); s.digits[dg].setMatrixAt(12, s.x.m2); s.digits[dg].instanceMatrix.needsUpdate = true; }
-    // portal: ring tubes beyond the ring plane vanish (only S03 shows through the hole), the floor too
-    s.floor.visible = t < 15.4;
-    for (let k = 0; k < 12; k++) {
-      const a = ((k + 0.5) / 12) * P * 2, r = s.ringG.rotation.y;
-      const x0 = Math.sin(a) * R_RING, z0 = -Math.cos(a) * R_RING;
-      const zw = -x0 * Math.sin(r) + z0 * Math.cos(r) + d;
-      const hide = t >= 15.4 && zw < zzP - 1;
+    // portal: from 15.4 everything beyond the zero's plane is hidden (S03 shows only through the hole)
+    const portal = t >= 15.4;
+    for (let k = 0; k < NT; k++) {
+      const zw = -Math.cos(s.tubeA[k]) * R_RING + d;
+      const hide = portal && zw < zz - 1;
       s.bodies.setMatrixAt(k, hide ? s.zeroM : s.tubeM[k]); s.caps.setMatrixAt(k, hide ? s.zeroM : s.tubeM[k]);
-      for (let dg = 0; dg < 10; dg++) s.digits[dg].setMatrixAt(k, hide ? s.zeroM : s.dM[dg][k]);
+      const v = hide ? -1 : ringDigit(k);
+      for (let dg = 0; dg < 10; dg++) s.digits[dg].setMatrixAt(k, v === dg ? s.dM[dg][k] : s.zeroM);
     }
-    if (t >= 15.4) { s.bodies.setMatrixAt(12, s.zeroM); s.caps.setMatrixAt(12, s.zeroM); for (let dg = 0; dg < 10; dg++) s.digits[dg].setMatrixAt(12, s.zeroM); }
-    for (const pv of s.petals) pv.visible = t < 15.4;
+    s.bodies.instanceMatrix.needsUpdate = true; s.caps.instanceMatrix.needsUpdate = true;
+    for (let dg = 0; dg < 10; dg++) s.digits[dg].instanceMatrix.needsUpdate = true;
+    s.floor.visible = !portal;
+    for (const pv of s.petals) pv.visible = !portal;
     s.bodyMat.uniforms.uRim.value.setHex(t >= 11.44 ? PAL.crimson : PAL.cream);
     s.bodyMat.uniforms.uRimAmt.value = lit ? 1 : 0.15;
     s.caps.material.uniforms.uBright.value = lit ? 1 : 0.25;
     s.flashRing.visible = t >= 9.48 && t < 9.515;
     // petals fold outward on "tonight"
     for (let i = 0; i < 8; i++) s.petals[i].rotation.x = -1.9 * kit.ease.inOut((t - 14.56 - (i % 2) * 0.06) / 0.75);
-    s.stars.visible = t >= 14.6 && t < 15.8;
-    s.stars.material.uniforms.uOpacity.value = t >= 15.43 && t < 15.6 ? 0.45 : 1;
-    // the zero ring: detaches on "Gold", eases down the wire, passes the eyes at ~15.8
-    const zk = Math.min(1, Math.max(0, (t - 12.8) / 3.0));
-    let zz = s.z0 + (0.05 - s.z0) * zk * zk;
-    if (t > 15.8) zz = 0.05 + (t - 15.8) * 16;
-    s.zero.visible = t >= 12.8 && t < 16.0;
-    s.zero.position.set(0, 1.8, zz);
-    s.zeroMesh.scale.set(0.446 + 0.554 * sm(12.8, 14.0, t), 1, 1);
-    s.matte.visible = t >= 15.4 && zz < 0.0;
-    s.hall.visible = !(t >= 15.8);
-    s.goldG.rotation.z = 0.05 * Math.sin(t * 2.2);
-    s.rod.visible = t >= 12.8 && t < 15.35;
-    if (kit.isOwner) {
-      const R = kit.rigState;
-      R.wheelSpin = d / 0.075;
-      R.dark = t < 9.48 ? 1 : 0;
-      // three gold sparks run from the zero to the cradle on "on the wire"
-      for (const ts of [13.62, 13.84, 14.02]) {
-        const a = (t - ts) / 0.4;
-        if (a >= 0 && a < 1) R.wire.pulses.push({ z: zz * (1 - a), a: 1, w: 0.9 });
-        if (t >= ts && t < ts + 0.12) R.gauge = 1;
-      }
-      kit.setSky(t >= 15.4 ? { moonR: 0.07, moonDir: [0.33, 0.26, -0.91], hor: PAL.petrolDeep, stars: 0.5 } : {});
-    }
+    s.hall.visible = t < 15.8;
+    if (kit.isOwner) kit.setSky(t >= 14.56 ? { moonR: 0.07, moonDir: [0.33, 0.26, -0.91], hor: PAL.petrolDeep, stars: 0.5 } : {});
     return t >= 9.48 && t < 9.51 ? { flash: PAL.gold } : undefined;
   },
   events() {

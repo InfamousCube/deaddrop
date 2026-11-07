@@ -72,29 +72,24 @@ export function scratch() {
 }
 
 // ------------------------------------------------------------------------------------------------
-// S05 Mirror Field layout (world-local metres; the field group sits at y = PLAIN_Y with travel on z)
-export const PLAIN_Y = -6;          // the plain lies 6 m below the cradle
-export const TOWER = [-18, -70];    // receiver tower (x, z)
-export const DISH_POST = 2;         // post height; the face centre sits at PLAIN_Y + DISH_POST + 0.2
+// S05 Mirror Field layout (world-local metres; the field group sits at y 0 with travel on z, so at
+// 29.46 world = local). 12 big dishes on one ring around a point 9 m ahead; the player drifts to its
+// centre. The dishes in front of the player at 29.46 receive S04's match-cut bubbles.
+export const PLAIN_Y = -4;          // the plain lies 4 m below the eyes' floor
+export const DISH_POST = 3.6;       // post height; the face centre sits at PLAIN_Y + DISH_POST + 0.2
+export const FACE_Y = PLAIN_Y + DISH_POST + 0.2;
+export const FACE_R = 2.0;          // dish face radius
+export const RING = { cz: -9, r: 15, n: 12 };
 let LAYOUT = null;
 export function dishLayout() {
   if (LAYOUT) return LAYOUT;
-  const R = [];
-  for (let i = 0; i < 8; i++) R.push(14 + 8.6 * i);
-  const sum = R.reduce((a, b) => a + b, 0);
-  const N = R.map((r) => Math.round((480 * r) / sum));
-  N[7] += 480 - N.reduce((a, b) => a + b, 0);
   const out = [];
-  R.forEach((r, i) => {
-    for (let k = 0; k < N[i]; k++) {
-      const a = (k / N[i]) * Math.PI * 2 + i * 0.37;
-      const x = TOWER[0] + Math.sin(a) * r, z = TOWER[1] + Math.cos(a) * r;
-      out.push({ x, z, ring: i, dist: Math.hypot(x, z) });
-    }
-  });
-  // the 48 dishes nearest the player get the match-cut discs (band 0, already up at 29.46)
-  const order = out.map((d, i) => i).sort((a, b) => out[a].dist - out[b].dist);
-  order.forEach((idx, rank) => { const d = out[idx]; d.rank = rank; d.band = rank < 48 ? 0 : d.dist < 45 ? 1 : d.dist < 80 ? 2 : 3; });
-  LAYOUT = { dishes: out, nearest: order.slice(0, 48) };
+  for (let k = 0; k < RING.n; k++) {
+    const a = ((k + 0.5) / RING.n) * Math.PI * 2;
+    const x = Math.sin(a) * RING.r, z = RING.cz - Math.cos(a) * RING.r;
+    out.push({ x, z, a, k, dist: Math.hypot(x, z) });
+  }
+  const nearest = out.map((D, i) => i).filter((i) => out[i].z < -6);
+  LAYOUT = { dishes: out, nearest };
   return LAYOUT;
 }

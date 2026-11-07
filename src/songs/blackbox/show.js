@@ -22,6 +22,8 @@ import S4 from './scenes-4.js';
 const sm = FX.sm;
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 export const SONG_LEN = 153.771;
+// the lobby is fully gone by this song time (fast, so no room/desk debris hangs behind the first title)
+export const LOBBY_GONE = 0.7;
 // every sung "gold on the wire": a white-gold pulse runs along the wire (from ahead, over the player, away behind)
 export const WIRE_PULSES = [0.26, 13.62, 47.48, 59.96, 64.94, 67.36, 95.16, 109.98, 127.68, 141.74, 145.6, 147.34];
 
@@ -60,7 +62,9 @@ class BlackBox {
     this.flash.renderOrder = 999;
     this.flash.frustumCulled = false;
     this.flash.visible = false;
-    root.add(this.dome.mesh, this.rig.group, this.flash);
+    // Leo (07.11.): nothing in front of the player during the song, no desk, no console, no
+    // cradle. The rig still computes its state (scenes read kit.rigState), but it is never drawn.
+    root.add(this.dome.mesh, this.flash);
     world.scene.add(root);
     this.root = root;
     makeText('GOLD ON THE WIRE', { cap: 0.1 }); // builds the glyph atlas now
@@ -210,10 +214,10 @@ class BlackBox {
   }
 
   look(L, t) {
-    // the lobby (room, desk, case, phone, tapes) breaks apart and sinks in the first 1.15 s,
+    // the lobby (room, desk, case, phone, tapes) breaks apart and sinks in the first 0.7 s (LOBBY_GONE),
     // stays gone for the whole song and rebuilds around the player at the very end
-    L.hideLobby = t < 151.8 ? sm(0.05, 1.15, t) : 1 - sm(151.8, 153.6, t);
-    L.breakU = t < 1.2 ? 1.8 * sm(0.0, 1.15, t) : 0;
+    L.hideLobby = t < 151.8 ? sm(0.05, LOBBY_GONE, t) : 1 - sm(151.8, 153.6, t);
+    L.breakU = t < LOBBY_GONE + 0.05 ? 2.4 * sm(0.0, LOBBY_GONE, t) : 0;
     L.stars = 0; L.beams = 0;
     const o = this.core ? this.owner(t) : null;
     if (o?.look) o.look(L, t);
@@ -234,8 +238,8 @@ class BlackBox {
     this.lastT = t;
     // the room's break (L.breakU) ends with a jump to 0 once the room is hidden; room.applyBreak(0)
     // skips the speaker cones, so settle every piece once with a tiny u (exact reset, any seek order)
-    if (t > 0 && t < 1.2) this._broke = true;
-    else if (this._broke && t >= 1.2) { this.world.room.applyBreak(1e-6); this._broke = false; }
+    if (t > 0 && t < LOBBY_GONE + 0.05) this._broke = true;
+    else if (this._broke && t >= LOBBY_GONE + 0.05) { this.world.room.applyBreak(1e-6); this._broke = false; }
     this.apply(t);
   }
 

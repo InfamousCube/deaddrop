@@ -79,14 +79,13 @@ export const S18 = {
       for (const L of Ls) { L.az = a0 + (cum + L.w / 2) / TITLE_R; cum += L.w + GAP; L.y0 = r.y; L.idx = s.letters.length; s.letters.push(L); }
     }
     // other type
-    kit.text('TONIGHT', { cap: 1.0, color: 'cream', times: [143.16], out: 144.5, at: { d: 6, az: 16, y: 1.6 } });
-    s.oh = kit.text('OH-OH', { cap: 1.5, color: 'gold', times: [144.58], pop: true, out: 146.4, at: { d: 6.5, az: -18, y: 2.1 } });
+    // one block at a time, low centre between the pole rows (calm black plain)
+    kit.text('TONIGHT', { cap: 1.0, color: 'cream', times: [143.16], out: 144.45, outDur: 0.1, depthTest: false, at: { d: 7, az: 0, y: 0.45 } });
+    s.oh = kit.text('OH-OH', { cap: 1.4, color: 'gold', times: [144.58], pop: true, out: 147.2, outDur: 0.12, depthTest: false, at: { d: 7, az: 0, y: 0.45 } });
     // TONIGHT sits under the title's lower row (ON / WIRE end 1.4 deg below the eye), clear of both
     s.ton2s = kit.text('TONIGHT', { cap: 2.1, color: 'black', times: [148.0], pop: true, dur: 0.12, out: 150.1, outDur: 0.4, depthTest: false, at: { d: 24.6, az: 0.5, y: -0.82 } });
     s.ton2s.mesh.renderOrder = 5;
     s.ton2 = kit.text('TONIGHT', { cap: 2.1, color: 'cream', times: [148.0], pop: true, dur: 0.12, out: 150.1, outDur: 0.4, depthTest: false, at: { d: 24, az: 0, y: -0.6 } }); // over the black plain, never cut by it
-    s.misty = kit.text('MISTYCONIFER', { cap: 0.5, color: 'cream', tracking: 0.45, times: [148.6], dur: 0.05, out: 151.2, outDur: 0.3, depthTest: false, at: { d: 10, az: 0, y: -0.4 } });
-    s.mistyY = s.misty.mesh.position.y;
     s.tonY = [s.ton2.mesh.position.y, s.ton2s.mesh.position.y];
 
     // the snip: one white spark at the sun end of the wire
@@ -115,7 +114,7 @@ export const S18 = {
     for (let i = 0; i < s.letters.length; i++) {
       const L = s.letters[i];
       const k = kit.ease.out(lin(L.ti, L.ti + 0.4, t));
-      const ks = kit.ease.in(lin(150.85 + i * 0.025, 151.4 + i * 0.025, t)); // all gone by ~151.7, before the lobby rebuild (151.8)
+      const ks = kit.ease.in(lin(150.85 + i * 0.015, 151.2 + i * 0.015, t)); // all gone by ~151.4, before the lobby rebuild (151.8)
       const drop = (L.y0 + CAP + 1.5) * ((1 - k) + ks);
       const y = L.y0 - drop;
       const sa = Math.sin(L.az), ca = Math.cos(L.az);
@@ -133,7 +132,6 @@ export const S18 = {
     s.ton2.mesh.position.y = s.tonY[0] - 4.5 * sinkT;
     s.ton2s.mesh.position.y = s.tonY[1] - 4.5 * sinkT;
     s.ton2.u.uBright.value = 1 + 0.5 * flare;
-    s.misty.mesh.position.y = s.mistyY - 1.5 * (1 - kit.ease.out(lin(148.6, 149.2, t))) - 2 * sinkT;
 
     if (kit.isOwner) {
       // the sky: dot -> full sun on "tonight", rays hold on the last beat, then go out from the edges inward
@@ -152,9 +150,12 @@ export const S18 = {
       sk.sunCol = fl ? PAL.white : PAL.amber; sk.sunRing = PAL.orange;
       const rp = Math.max(envAt(t, 146.31, 6), envAt(t, 146.9, 6), 0.7 * envAt(t, 148.0, 3));
       sk.rayA = lerpCol(s.c[0], PAL.crimson, PAL.red, rp);
+      // a flat red field instead of a black sky (black stays on the plain)
+      sk.zen = PAL.carmine; sk.hor2 = PAL.carmine; sk.hor = PAL.crimson;
       sk.rayR = 1.45 * (1 - kit.sm(150.0, 152.5, t)) + 0.0001;
-      sk.rays = 1;
-      sk.rings = 1 - kit.sm(150.0, 151.4, t);
+      // sunburst only on the two chorus hits: "gold" (145.6) and the title + "tonight" (147.34-149)
+      sk.rays = Math.max(kit.sm(145.6, 145.68, t) * (1 - kit.sm(145.9, 146.5, t)), kit.sm(147.34, 147.42, t) * (1 - kit.sm(148.7, 149.4, t)));
+      sk.rings = 0;
       sk.amt = 1 - kit.sm(152.6, 153.5, t);
       kit.setSky(sk);
       // the wire: sparks run INTO the sun on "gold" and on the title, then it is snipped at 151.5

@@ -1,263 +1,140 @@
-// S10 The panel room, then the chessboard (76.89-83.75, cold, flipped hot by "one red light").
-// 24 flip panels (2 x 10 m) ring the cradle at r 8; one red alarm dome; the panels spin on "spins",
-// show chess backs, sink, and a crimson checkerboard lights out into the fog with 31 lathe pieces.
-// Out: PORTAL 83.36-84.06, the hatch ring flies over the player; S11's sea shows only in its hole.
+// S10 One red light (76.89-83.75, cold, flipped red on "spins"). Clean rework 07.11.
+// SHOT CARD
+//   beat A 76.89-81.95  hero: ONE red alarm lamp straight ahead over a red floor pool.
+//                       supports: an octagon of 8 big plain wall panels (petrol), which flip in a
+//                       ripple on "spins" and show crimson backs.
+//                       palette: black + petrol, accent red. Motion: lamp on, then the flip. Nothing else.
+//   beat B 81.8-83.75   hero: ONE giant black chess king (15 m, gold rim) standing at the right from the cut
+//                       (81.8, rising only 2 m, slowly), his two white eyes open on "begins". support: a big-cell
+//                       carmine/black board that is there at once (5 m cells, fogged to black by 75 m; no radial sweep).
+//                       palette: black + carmine (board, low horizon glow) + one crimson disc behind the king
+//                       (so he reads as a big black silhouette, not a thin gold outline), accent gold/white.
+//   lyric: one 2-line block straight ahead between lamp and pool (beat A), one 2-line block left of
+//          the king (beat B). Out: the board goes out from the rim inward, the eyes stay, hard cut.
+//   removed: 24 gauge panels with 300 dials, chess-symbol backs, word-per-panel text, radar wedge,
+//            light cone, 31 chess pieces, hatch ring with iris blades and portal matte, 8 m/s travel.
 import * as THREE from 'three';
 import { PAL } from './style.js';
-import { setI, inst, instColors, setC, merge, facet, box, disc, ring, shape, fitText, sm, clamp01, easeIn, easeOut, easeInOut, env, HOT_SKY, FOG_U, FOG_APPLY, fogUniforms, WORLD_V, TMP } from './scenes-3-util.js';
+import { setI, inst, merge, box, disc, fitText, sm, clamp01, easeOut, easeInOut, env, FOG_U, FOG_APPLY, fogUniforms, WORLD_V } from './scenes-3-util.js';
 
-const N = 24, R = 8, PW = 2.02, PH = 10, FLOOR = -1.2;
-const T_RED = 77.72, T_LIGHT = 78.06, T_SWEEP = 79.17, T_ROOM = 79.58, T_SPIN = 80.18, T_STOP = 81.18, T_SINK = 81.46, T_GAME = 82.42, T_BEGIN = 83.36;
-const RING_Z = -12;
-const WORD_PANELS = [22, 23, 0, 1, 2]; // AND THE WHOLE ROOM SPINS (fronts), THAT'S THE SECOND (backs of the first three)
-export const S10_RING = { z0: RING_Z, t0: T_BEGIN, dur: 0.72 };
-const ringZ = (t) => RING_Z + 12.3 * easeIn((t - T_BEGIN) / 0.72); // passes the eyes at ~84.06
+const N = 8, R = 9, PW = 7.3, PH = 13, FLOOR = -1.4;
+const T_RED = 77.72, T_LIGHT = 78.06, T_SPIN = 80.18, T_DARK = 81.46, T_BOARD = 81.8, T_GAME = 82.42, T_BEGIN = 83.36, T_OFF = 83.5, T_END = 83.75;
+const KING = { x: 7.5, z: -24, h: 15 };
 
 const FLOOR_F = /* glsl */ `
-uniform float uR, uClipZ, uOffZ; uniform vec3 uA, uB; ${FOG_U}
+uniform float uR, uRin; uniform vec3 uA, uB; ${FOG_U}
 varying vec3 vW; varying float vDepth;
 void main() {
-  if (vW.z < uClipZ) discard;
-  vec2 b = vec2(vW.x, vW.z - uOffZ);
-  vec2 cell = floor((b + 1.5) / 3.0);
+  vec2 cell = floor((vW.xz + 2.5) / 5.0);
   float chk = mod(cell.x + cell.y, 2.0);
-  float lit = step(length(cell * 3.0), uR);
+  float r = length(vW.xz);
+  float lit = step(r, uR) * step(uRin, r);
   vec3 c = lit * (chk > 0.5 ? uA : uB);
   ${FOG_APPLY}
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
 }`;
 
-// lathe chess pieces (profiles normalised to height 1)
-const PROF = {
-  pawn: [[0, 0], [0.42, 0], [0.42, 0.08], [0.3, 0.15], [0.2, 0.5], [0.3, 0.56], [0.13, 0.62], [0.27, 0.74], [0.27, 0.88], [0.13, 0.99], [0, 1]],
-  rook: [[0, 0], [0.4, 0], [0.4, 0.08], [0.28, 0.16], [0.24, 0.72], [0.34, 0.76], [0.34, 1], [0, 1]],
-  bishop: [[0, 0], [0.38, 0], [0.38, 0.07], [0.24, 0.14], [0.14, 0.58], [0.26, 0.62], [0.12, 0.66], [0.22, 0.8], [0.12, 0.94], [0.05, 1], [0, 1]],
-  queen: [[0, 0], [0.38, 0], [0.38, 0.07], [0.24, 0.15], [0.13, 0.66], [0.28, 0.72], [0.16, 0.78], [0.3, 0.92], [0.18, 0.95], [0, 0.97]],
-  king: [[0, 0], [0.38, 0], [0.38, 0.07], [0.24, 0.15], [0.14, 0.7], [0.28, 0.75], [0.15, 0.8], [0.27, 0.9], [0, 0.9]],
-  knight: [[0, 0], [0.4, 0], [0.4, 0.08], [0.27, 0.16], [0.22, 0.42], [0, 0.42]],
-};
-const HGT = { pawn: 3, rook: 4.4, knight: 5, bishop: 5.6, queen: 7, king: 8 };
-function pieceGeo(type) {
-  const pts = PROF[type].map(([r, y]) => new THREE.Vector2(r, y));
-  const parts = [{ g: new THREE.LatheGeometry(pts, 9) }];
-  if (type === 'king') parts.push({ g: box(0.08, 0.2, 0.08, 0, 1.0, 0) }, { g: box(0.2, 0.06, 0.08, 0, 1.02, 0) });
-  if (type === 'queen') parts.push({ g: new THREE.IcosahedronGeometry(0.07, 0).translate(0, 1.0, 0) });
-  if (type === 'knight') parts.push({ g: box(0.26, 0.42, 0.5, 0, 0.62, -0.06, -0.35) }, { g: box(0.22, 0.2, 0.36, 0, 0.86, 0.12, 0.25) }, { g: box(0.1, 0.12, 0.1, 0, 0.98, -0.18) });
-  const g = merge(parts);
-  g.scale(HGT[type] * 0.85, HGT[type], HGT[type] * 0.85);
+// lathe king (profile normalised to height 1) with a chunky cross
+const KING_P = [[0, 0], [0.4, 0], [0.4, 0.08], [0.26, 0.16], [0.15, 0.66], [0.3, 0.72], [0.16, 0.78], [0.28, 0.88], [0, 0.9]];
+function kingGeo(h) {
+  const g = merge([
+    { g: new THREE.LatheGeometry(KING_P.map(([r, y]) => new THREE.Vector2(r, y)), 10) },
+    { g: box(0.09, 0.2, 0.09, 0, 0.99, 0) }, { g: box(0.24, 0.07, 0.09, 0, 1.01, 0) },
+  ]);
+  g.scale(h * 0.85, h, h * 0.85);
   return g;
 }
 
-function panelDecor() {
-  const P = [];
-  const z = 0.111;
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 2; c++) {
-    const x = c ? 0.47 : -0.47, y = -3.1 + r * 1.42, a = ((r * 7 + c * 3) % 9) / 9 * 2.4 - 1.2;
-    P.push({ g: disc(0.27, 12, x, y, z), c: 1 }, { g: ring(0.27, 0.33, 12, x, y, z + 0.002), c: 0 });
-    P.push({ g: new THREE.PlaneGeometry(0.04, 0.22).translate(0, 0.1, 0).rotateZ(a).translate(x, y, z + 0.004), c: 0 });
-  }
-  for (let i = 0; i < 5; i++) P.push({ g: disc(0.085, 8, -0.72 + i * 0.36, 4.35, z), c: 1 });
-  for (let i = 0; i < 4; i++) {
-    const x = -0.63 + i * 0.42;
-    P.push({ g: new THREE.PlaneGeometry(0.22, 0.34).translate(x, -4.25, z), c: 1 });
-    P.push({ g: new THREE.PlaneGeometry(0.05, 0.2).translate(x, -4.2 + (i % 2 ? 0.05 : -0.05), z + 0.003), c: 0 });
-  }
-  P.push({ g: new THREE.PlaneGeometry(1.7, 0.05).translate(0, 3.95, z), c: 1 }, { g: new THREE.PlaneGeometry(1.7, 0.05).translate(0, -3.75, z), c: 1 });
-  return merge(P);
-}
-const KNIGHT = [[-0.45, 0], [0.45, 0], [0.45, 0.08], [0.32, 0.14], [0.3, 0.22], [0.28, 0.3], [0.34, 0.5], [0.36, 0.62], [0.3, 0.78], [0.16, 0.92], [0.05, 1], [-0.02, 0.92], [-0.12, 0.88], [-0.3, 0.74], [-0.44, 0.6], [-0.4, 0.52], [-0.22, 0.56], [-0.08, 0.5], [-0.24, 0.32], [-0.3, 0.22], [-0.32, 0.14], [-0.45, 0.08]];
-const KING = [[-0.4, 0], [0.4, 0], [0.4, 0.08], [0.26, 0.15], [0.16, 0.62], [0.3, 0.68], [0.18, 0.74], [0.3, 0.84], [0.04, 0.86], [0.04, 0.92], [0.12, 0.92], [0.12, 0.96], [0.04, 0.96], [0.04, 1.02], [-0.04, 1.02], [-0.04, 0.96], [-0.12, 0.96], [-0.12, 0.92], [-0.04, 0.92], [-0.04, 0.86], [-0.3, 0.84], [-0.18, 0.74], [-0.3, 0.68], [-0.16, 0.62], [-0.26, 0.15], [-0.4, 0.08]];
-function backDecor(pts) { return merge([{ g: shape(pts, 3.4, 0, 0.5).rotateY(Math.PI).translate(0, 0, -0.111), c: 1 }]); }
-
-// pieces: [type, x, z, side(0 player gold, 1 enemy black)]
-const PIECES = [];
-[-12, -9, -6, -3, 3, 6, 9].forEach((x) => PIECES.push(['pawn', x, 0, 0]));
-[['rook', -12], ['knight', -9], ['bishop', -6], ['queen', -3], ['king', 0], ['bishop', 3], ['knight', 6], ['rook', 9]].forEach(([k, x]) => PIECES.push([k, x, 4, 0]));
-[-12, -9, -6, -3, 0, 3, 6, 9].forEach((x) => PIECES.push(['pawn', x, -18, 1]));
-[['rook', -12], ['knight', -9], ['bishop', -6], ['queen', -3], ['king', 0], ['bishop', 3], ['knight', 6], ['rook', 9]].forEach(([k, x]) => PIECES.push([k, x, -22, 1]));
-
 export const S10 = {
-  id: 'S10', t0: 76.89, t1: 83.75, world: 'cold', pre: 0, post: 0.32,
-  key: [0.5, 0.75, 0.3], fog: { near: 14, far: 95 }, sky: 'black',
+  id: 'S10', t0: 76.89, t1: T_END, world: 'cold', pre: 0, post: 0,
+  key: [0.5, 0.75, 0.3], fog: { color: PAL.black, near: 14, far: 75 }, sky: 'black',
   flashes: [{ t: T_LIGHT, color: PAL.crimson, dur: 0.03 }],
   build(kit) {
     const s = {};
     s.root = new THREE.Group(); kit.group.add(s.root);
-    s.board = new THREE.Group(); s.root.add(s.board);
-    // --- the panel ring
-    s.pmat = kit.toon({ ramp: 'world', vertexColors: true });
-    const pg = facet(new THREE.BoxGeometry(PW, PH, 0.2));
-    const pc = new Float32Array(pg.getAttribute('position').count * 3), pn = pg.getAttribute('normal');
-    for (let i = 0; i < pn.count; i++) { const z = pn.getZ(i); const v = z > 0.5 ? 1 : z < -0.5 ? 0.04 : 0.35; pc.set([v, v, v], i * 3); }
-    pg.setAttribute('color', new THREE.BufferAttribute(pc, 3));
-    s.panels = inst(pg, s.pmat, N, 's10-panels');
-    s.dmat = kit.flat({ color: PAL.cream, vertexColors: true });
-    s.decor = inst(panelDecor(), s.dmat, N, 's10-decor');
-    s.backA = inst(backDecor(KNIGHT), kit.flat({ color: PAL.cream }), N / 2);
-    s.backB = inst(backDecor(KING), kit.flat({ color: PAL.cream }), N / 2);
-    instColors(s.decor); instColors(s.backA); instColors(s.backB);
-    s.zero = new THREE.Matrix4().makeScale(0, 0, 0);
-    s.root.add(s.panels, s.decor, s.backA, s.backB);
-    s.car = WORD_PANELS.map(() => { const g = new THREE.Group(); g.matrixAutoUpdate = false; s.root.add(g); return g; });
-    // ceiling (black) and floor (checkerboard shader)
-    s.ceil = new THREE.Mesh(new THREE.CircleGeometry(9, 24).rotateX(Math.PI / 2), kit.flat({ color: PAL.black, side: THREE.DoubleSide }));
-    s.ceil.position.y = 10.8; s.root.add(s.ceil);
-    s.fu = { ...fogUniforms(kit), uR: { value: 0 }, uClipZ: { value: -1e4 }, uOffZ: { value: 0 }, uA: { value: new THREE.Color(PAL.crimson) }, uB: { value: new THREE.Color(PAL.black) } };
-    s.floor = new THREE.Mesh(new THREE.PlaneGeometry(240, 240).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: s.fu, vertexShader: WORLD_V, fragmentShader: FLOOR_F }));
-    s.floor.position.y = FLOOR; s.board.add(s.floor);
-    // the red alarm dome lamp (6 m ahead, +12 deg, y 5) with its flat cone and floor pool
-    s.lampPos = new THREE.Vector3(0, 5.6, -6);
-    s.lamp = new THREE.Group(); s.lamp.position.copy(s.lampPos); s.board.add(s.lamp);
-    s.lampMat = kit.flat({ color: PAL.carmineDeep });
-    const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), s.lampMat);
-    const cap = new THREE.Mesh(merge([{ g: new THREE.CylinderGeometry(1.08, 1.08, 0.22, 14).translate(0, 0.1, 0), c: 0.05 }, { g: box(0.08, 6, 0.08, 0, 3.2, 0), c: 0.03 }]), kit.toon({ ramp: 'black', rim: PAL.gold, vertexColors: true }));
-    s.cone = new THREE.Mesh(new THREE.ConeGeometry(2.4, 6.8, 18, 1, true).translate(0, -3.4, 0), kit.flat({ color: PAL.red, opacity: 0.16, additive: true, side: THREE.DoubleSide }));
-    s.pool = new THREE.Mesh(new THREE.CircleGeometry(2.4, 24).rotateX(-Math.PI / 2), kit.flat({ color: PAL.red, opacity: 0.45, additive: true }));
-    s.pool.position.y = FLOOR - 5.6 + 0.03;
-    s.lamp.add(dome, cap, s.cone, s.pool);
-    // radar sweep wedge
-    s.radar = new THREE.Mesh(new THREE.CircleGeometry(15, 10, 0, 0.65).rotateX(-Math.PI / 2), kit.flat({ color: PAL.crimson, opacity: 0.32, additive: true }));
-    s.radar.position.y = FLOOR + 0.04; s.board.add(s.radar);
-    // chess pieces: one InstancedMesh per type, gold ramp; enemy = near-black via instanceColor, cream rims
-    s.pieceMeshes = {}; s.pieceList = [];
-    for (const type of Object.keys(HGT)) {
-      const list = PIECES.filter((p) => p[0] === type);
-      const m = inst(pieceGeo(type), kit.toon({ ramp: 'gold', rim: PAL.cream, rimTh: 0.55 }), list.length, 's10-' + type);
-      instColors(m);
-      list.forEach((p, i) => { setC(m, i, p[3] ? 0x121012 : 0xffffff); s.pieceList.push({ m, i, type, x: p[1], z: p[2], side: p[3] }); });
-      s.pieceMeshes[type] = m; s.board.add(m);
-    }
-    // the enemy king's two eye dots
-    s.eyes = new THREE.Mesh(merge([{ g: disc(0.16, 8, -0.32, 0, 0) }, { g: disc(0.16, 8, 0.32, 0, 0) }]), kit.flat({ color: PAL.white, vertexColors: true }));
-    s.eyes.position.set(0, FLOOR + 8 * 0.84, -22 + 8 * 0.85 * 0.3); s.board.add(s.eyes);
-    // the hatch ring with iris blades and the portal matte
-    s.hatch = new THREE.Group(); s.root.add(s.hatch);
-    s.hring = new THREE.Mesh(facet(new THREE.TorusGeometry(4, 0.34, 6, 40)), kit.toon({ ramp: 'gold', rim: PAL.cream }));
-    const bl = 4.25, bgeo = new THREE.BufferGeometry();
-    bgeo.setAttribute('position', new THREE.Float32BufferAttribute([-bl, 0, 0, 0, 0, 0, bl * Math.cos(Math.PI / 3) - bl, bl * Math.sin(Math.PI / 3), 0], 3));
-    bgeo.computeVertexNormals();
-    s.blades = inst(bgeo, kit.toon({ ramp: [PAL.velvet, PAL.carmineDeep, PAL.carmine], rim: PAL.gold, side: THREE.DoubleSide }), 6, 's10-iris');
-    s.matte = kit.matte({ shape: 'circle', r: 3.72 });
-    s.hatch.add(s.hring, s.blades, s.matte);
-    // type
-    s.tOne = kit.text('ONE RED LIGHT', { cap: 0.95, color: 'gold', near: 77.62, out: 80.9, at: { d: 6, az: 0, y: 3.45 } });
-    // one sung word per flip panel: the sentence spins away with its panels; the backs carry the next line
-    const fw = kit.words.match('and the whole room spins', 78.54), bw = kit.words.match("that's the second", 81.18);
-    ['AND', 'THE', 'WHOLE', 'ROOM', 'SPINS'].forEach((w, k) => {
-      const T = kit.text(w, { cap: 1.15, color: 'cream', times: [fw ? fw[k].s : 78.54 + k * 0.4], out: 81.0, parent: s.car[k] });
-      fitText(T, 1.9); T.mesh.position.set(0, -2.35, 0.13);
-    });
-    ["THAT'S", 'THE', 'SECOND'].forEach((w, k) => {
-      const T = kit.text(w, { cap: 1.15, color: 'cream', times: [bw ? bw[k].s : 81.18 + k * 0.3], out: 82.7, parent: s.car[k] });
-      fitText(T, 1.9); T.mesh.position.set(0, -2.35, -0.13); T.mesh.rotation.y = Math.PI;
-    });
-    s.tGame = kit.text('THE GAME BEGINS', { cap: 1.25, color: 'gold', near: 82.42, out: 83.62, pop: true, at: { d: 6, az: 0, y: 1.75 } });
-    s.prof = kit.travel([[T_BEGIN, 8, 1.2]]);
+    // --- the octagon room: 8 plain panels, petrol fronts and crimson backs (two thin plates each)
+    s.front = inst(new THREE.BoxGeometry(PW, PH, 0.12).translate(0, 0, 0.07), kit.toon({ ramp: [PAL.petrolDeep, PAL.petrol, PAL.teal], rim: PAL.cyan }), N, 's10-front');
+    s.back = inst(new THREE.BoxGeometry(PW, PH, 0.12).translate(0, 0, -0.07), kit.toon({ ramp: [PAL.carmineDeep, PAL.carmine, PAL.crimson], rim: PAL.gold }), N, 's10-back');
+    s.root.add(s.front, s.back);
+    // floor of the room (black) with the lamp's red pool
+    s.lampPos = new THREE.Vector3(0, 5.4, -8.5);
+    s.pool = new THREE.Mesh(new THREE.CircleGeometry(2.8, 28).rotateX(-Math.PI / 2), kit.flat({ color: PAL.red }));
+    s.pool.position.set(0, FLOOR + 0.02, s.lampPos.z);
+    // the lamp: a chunky red dome under a black cap on a thick hanger
+    s.lampMat = kit.flat({ color: PAL.red });
+    s.dome = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), s.lampMat);
+    s.cap = new THREE.Mesh(merge([{ g: new THREE.CylinderGeometry(1.3, 1.3, 0.3, 16).translate(0, 0.12, 0) }, { g: box(0.3, 8, 0.3, 0, 4.2, 0) }]), kit.toon({ ramp: 'black', rim: PAL.gold, rimTh: 0.5 }));
+    s.dome.position.copy(s.lampPos); s.cap.position.copy(s.lampPos);
+    s.root.add(s.pool, s.dome, s.cap);
+    // --- the board (shader floor) and the king
+    s.fu = { ...fogUniforms(kit), uR: { value: -1 }, uRin: { value: -1 }, uA: { value: new THREE.Color(PAL.carmine) }, uB: { value: new THREE.Color(PAL.black) } };
+    s.floor = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2), new THREE.ShaderMaterial({ uniforms: s.fu, vertexShader: WORLD_V, fragmentShader: FLOOR_F }));
+    s.floor.position.y = FLOOR; s.floor.frustumCulled = false;
+    s.root.add(s.floor);
+    s.king = new THREE.Group(); s.root.add(s.king);
+    s.king.add(new THREE.Mesh(kingGeo(KING.h), kit.toon({ ramp: 'black', rim: PAL.gold, rimTh: 0.45 })));
+    s.eyes = new THREE.Mesh(merge([{ g: disc(0.62, 12, -1.0, 0, 0) }, { g: disc(0.62, 12, 1.0, 0, 0) }]), kit.flat({ color: PAL.white, vertexColors: true }));
+    s.eyes.position.set(0, KING.h * 0.8, KING.h * 0.85 * 0.19 + 0.1);
+    s.king.add(s.eyes);
+    s.king.rotation.y = Math.atan2(-KING.x, -KING.z);
+    // --- type: one block per line
+    // one short phrase at a time (max 2 lines of about 10 letters, cap 1 m at 7.5 m)
+    const at0 = { d: 5, az: 0, y: 1.85 }; // in front of the flipping panels (their edges swing in to 5.35 m)
+    s.texts = [
+      kit.text('ONE RED LIGHT', { cap: 0.68, color: 'cream', colors: { 1: PAL.red }, near: 77.62, say: 'one red light', outDur: 0.15, out: 78.38, at: at0 }),
+      kit.text('AND THE WHOLE\nROOM SPINS', { cap: 0.68, color: 'cream', near: 78.54, say: 'and the whole room spins', outDur: 0.15, out: 80.95, at: at0 }),
+      kit.text("THAT'S THE\nSECOND", { cap: 0.68, color: 'gold', near: 81.18, say: "that's the second", outDur: 0.15, out: 82.25, at: { ...at0, az: -22 } }), // left of the king and his disc
+      kit.text('THE GAME\nBEGINS', { cap: 1.1, color: 'gold', near: 82.42, say: 'the game begins', outDur: 0.15, out: T_OFF + 0.1, at: { d: 7.5, az: -27, y: 1.7 } }),
+    ];
+    for (const T of s.texts) fitText(T, 6);
+    s.hor = new THREE.Color(); s.hor2 = new THREE.Color(); s.hBlack = new THREE.Color(PAL.black); s.hRed = new THREE.Color(PAL.carmine); s.hDeep = new THREE.Color(PAL.carmineDeep);
     return s;
   },
   update(t, s, kit) {
-    const hot = t >= T_LIGHT ? 1 : 0;
-    const d = s.prof.d(t);
-    const pass = ringZ(t) > 0.05;
-    s.root.visible = !pass;
-    // room light: black until the red lamp, dim cold, then hot
-    const light = t < T_RED ? 0 : t < T_LIGHT ? 0.55 : 1;
-    s.pmat.uniforms.uBright.value = light;
-    s.dmat.uniforms.uColor.value.set(hot ? PAL.gold : PAL.cream);
-    s.dmat.uniforms.uBright.value = light;
-    // panels: wobble on "room", 540 deg spin ripple on "spins", sink on the downbeat after "That's"
-    const m = TMP.m;
+    // panels: ripple flip on "spins" (each about its own vertical axis), lights out on the downbeat
+    const light = t < T_RED ? 0 : 1;
     for (let i = 0; i < N; i++) {
       const a = (i / N) * Math.PI * 2;
-      let ph = 0;
-      if (t > T_ROOM && t < T_SPIN + 0.6) ph += 0.16 * Math.sin((t - T_ROOM) * 15 + i * 0.9) * Math.exp(-(t - T_ROOM) * 2.5);
-      const st = T_SPIN + (((i - WORD_PANELS[0] + N) % N) / N) * 0.4;
-      if (t >= st) ph += 3 * Math.PI * easeInOut((t - st) / 0.6);
-      const aw = Math.abs(Math.atan2(Math.sin(a), Math.cos(a)));
-      const sk = T_SINK + (1 - aw / Math.PI) * 0.45;
-      const y = FLOOR + PH / 2 - 12.5 * easeIn((t - sk) / 0.9);
-      const hide = t > sk + 0.95;
-      setI(s.panels, i, Math.sin(a) * R, y, -Math.cos(a) * R, 0, -a + ph, 0, hide ? 0 : 1);
-      // decor shading follows the panel's facing (hard steps, like the toon ramp)
-      const ca = Math.cos(a - ph), sa = Math.sin(a - ph);
-      const dn = -0.526 * sa + 0.316 * ca;
-      const shF = dn < -0.1 ? 0.22 : dn < 0.45 ? 0.62 : 1, shB = -dn < -0.1 ? 0.22 : -dn < 0.45 ? 0.62 : 1;
-      const wk = WORD_PANELS.indexOf(i);
-      s.decor.setMatrixAt(i, wk >= 0 ? s.zero : m);
-      setC(s.decor, i, 0xffffff, shF);
-      const bk = i % 2 ? s.backB : s.backA;
-      bk.setMatrixAt(i >> 1, wk >= 0 && wk < 3 ? s.zero : m);
-      setC(bk, i >> 1, 0xffffff, shB);
-      if (wk >= 0) { s.car[wk].matrix.copy(m); s.car[wk].matrixWorldNeedsUpdate = true; }
+      const aw = Math.abs(Math.atan2(Math.sin(a), Math.cos(a))) / Math.PI; // 0 ahead, 1 behind
+      const st = T_SPIN + aw * 0.35;
+      const ph = Math.PI * easeInOut((t - st) / 0.75);
+      const dk = 1 - sm(T_DARK + aw * 0.3, T_DARK + aw * 0.3 + 0.12, t);
+      const sc = t < T_BOARD ? 1 : 0;
+      setI(s.front, i, Math.sin(a) * R, FLOOR + PH / 2, -Math.cos(a) * R, 0, -a + ph, 0, sc);
+      setI(s.back, i, Math.sin(a) * R, FLOOR + PH / 2, -Math.cos(a) * R, 0, -a + ph, 0, sc);
+      if (i === 0) { s.front.material.uniforms.uBright.value = light * dk * 0.85; s.back.material.uniforms.uBright.value = light * dk; }
     }
-    s.panels.instanceMatrix.needsUpdate = true; s.decor.instanceMatrix.needsUpdate = true;
-    s.backA.instanceMatrix.needsUpdate = true; s.backB.instanceMatrix.needsUpdate = true;
-    s.decor.instanceColor.needsUpdate = true; s.backA.instanceColor.needsUpdate = true; s.backB.instanceColor.needsUpdate = true;
-    // ceiling lifts away with the panels
-    s.ceil.position.y = 10.8 + 40 * easeIn((t - T_SINK) / 1.2);
-    s.ceil.visible = t < T_SINK + 1.2;
-    // board travel (only after "begins"), floor lights out radially on the downbeat
-    s.board.position.z = d;
-    s.fu.uOffZ.value = d;
-    s.fu.uR.value = t < T_SINK ? -1 : (t - T_SINK) * 46;
-    s.fu.uClipZ.value = t > T_BEGIN + 0.02 ? ringZ(t) : -1e4;
-    // lamp
-    const on = t >= T_RED;
+    s.front.instanceMatrix.needsUpdate = true; s.back.instanceMatrix.needsUpdate = true;
+    // the lamp: dark dome until "red", on with a beat pulse; it goes out with the room
+    const on = t >= T_RED && t < T_BOARD;
     s.lampMat.uniforms.uColor.value.set(on ? PAL.red : PAL.carmineDeep);
-    s.lampMat.uniforms.uBright.value = on ? 1 + 0.6 * env(t, T_RED, 5) : (t >= 77.62 ? 0.15 : 0);
-    s.cone.visible = s.pool.visible = on;
-    s.cone.material.uniforms.uOpacity.value = 0.12 + 0.1 * kit.beatEnv(t, 7);
-    // radar wedge
-    s.radar.visible = t >= T_SWEEP && t < T_SINK + 0.6;
-    s.radar.rotation.y = -(t - T_SWEEP) * Math.PI / 2;
-    s.radar.material.uniforms.uOpacity.value = 0.32 * (1 - sm(T_SINK, T_SINK + 0.6, t));
-    // pieces rise ("the game"), the gold pawn advances and the enemy king looks ("begins")
-    for (const p of s.pieceList) {
-      const H = HGT[p.type];
-      const rt = p.side ? T_GAME + Math.abs(p.x) * 0.012 + (p.z < -20 ? 0.12 : 0) : 82.62 + (p.z > 1 ? 0.15 : 0) + Math.abs(p.x) * 0.01;
-      let y = FLOOR - (H + 0.6) * (1 - easeOut((t - rt) / 0.45));
-      let z = p.z;
-      if (!p.side && p.type === 'pawn' && p.x === 3) z -= 6 * easeInOut((t - T_BEGIN) / 0.45);
-      if (p.side) y -= (H + 1) * easeIn((t - 83.55) / 0.3);
-      const ry = p.side ? 0 : Math.PI;
-      setI(p.m, p.i, p.x, y, z, 0, ry, 0, y < FLOOR - H - 0.5 ? 0 : 1);
-    }
-    for (const k in s.pieceMeshes) s.pieceMeshes[k].instanceMatrix.needsUpdate = true;
-    s.eyes.visible = t >= T_BEGIN && t < 83.8;
-    s.eyes.position.y = FLOOR + 8 * 0.8 - 9 * easeIn((t - 83.55) / 0.3);
-    s.eyes.material.uniforms.uBright.value = 1.4;
-    // hatch ring: rises at z -12, spins open on "begins", flies over the player
-    const rz = ringZ(t);
-    s.hatch.visible = t > 82.9 && !pass;
-    s.hatch.position.set(0, -10 + 11.6 * easeOut((t - 82.9) / 0.46), rz);
-    s.hring.rotation.z = t * 0.6 + 2 * easeOut((t - T_BEGIN) / 0.4);
-    const open = easeInOut((t - T_BEGIN) / 0.28);
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * Math.PI * 2 + s.hring.rotation.z;
-      setI(s.blades, k, Math.cos(a) * bl(), Math.sin(a) * bl(), 0.02, 0, 0, a + open * 0.9, Math.max(0.0001, 1 - open));
-    }
-    s.blades.instanceMatrix.needsUpdate = true;
-    s.matte.visible = t >= T_BEGIN + 0.03;
-    // cradle and world
+    s.lampMat.uniforms.uBright.value = (on ? 1 + 0.35 * env(t, T_RED, 4) + 0.15 * kit.beatEnv(t, 7) : 0.25) * (t < T_DARK ? 1 : 1 - sm(T_DARK, T_DARK + 0.12, t));
+    s.dome.visible = s.cap.visible = t >= 77.5 && t < T_BOARD;
+    s.pool.visible = on && t < T_DARK + 0.12;
+    // board: lights radially from the player, goes out from the rim inward at the end
+    s.floor.visible = t >= T_BOARD;
+    s.fu.uR.value = t >= T_BOARD && t < T_OFF + 0.12 ? 48 : -1; // a cut in and a cut out (the old 45 m/s sweep raced out under the player)
+    s.fu.uRin.value = -1;
+    // the king stands there from the board cut (81.8) and rises only 2 m (at most 1.9 m/s); eyes open on "begins"
+    s.king.visible = t >= T_BOARD;
+    s.king.position.set(KING.x, FLOOR - 2 * (1 - sm(T_BOARD, 83.4, t)), KING.z);
+    s.eyes.visible = t >= T_BEGIN;
+    s.eyes.material.uniforms.uBright.value = 1.2 + 0.6 * env(t, T_BEGIN, 5);
+    s.king.children[0].visible = t < T_OFF + 0.12;
     if (kit.isOwner) {
-      kit.setWorld('hot', hot);
-      const rs = kit.rigState;
-      rs.dark = t < T_RED ? 1 : t < T_LIGHT ? 0.5 : 0;
-      if (t >= T_LIGHT && t < T_LIGHT + 0.25) rs.gauge = 1;
-      rs.lampOn = on ? 1 : 0;
-      rs.wheelSpin = d / 0.075;
-      if (t >= T_LIGHT) kit.setSky({ ...HOT_SKY, rot: t * 0.035, ringPhase: t * 0.12, rays: t < T_SINK ? 0 : sm(T_SINK, T_SINK + 1.0, t), rings: t < T_SINK ? 0 : 1 });
+      kit.setWorld('hot', sm(T_SPIN, T_SPIN + 0.8, t));
+      kit.rigState.lampOn = on ? 1 : 0;
+      // beat B: a low carmine glow on the horizon, so the black king reads as a silhouette
+      if (t >= T_BOARD) { const k = sm(T_BOARD, T_BOARD + 0.25, t) * (1 - sm(T_OFF, T_END, t)); s.hor.copy(s.hBlack).lerp(s.hRed, k); s.hor2.copy(s.hBlack).lerp(s.hDeep, k); kit.setSky({ hor: s.hor.getHex(), hor2: s.hor2.getHex(), sunR: t < T_OFF + 0.12 ? 0.24 : 0 /* cut in with the board */, sunCol: PAL.crimson, sunRing: PAL.carmine, focal: [KING.x, FLOOR + 8, KING.z] }); }
     }
   },
   events() {
     return [
       { t: T_RED, sfx: 'switch', gain: 0.7, haptic: [0.3, 40] },
-      { t: T_LIGHT, sfx: 'crack', gain: 0.45, haptic: [0.4, 50] },
-      { t: T_SPIN, sfx: 'whoosh', gain: 0.55 },
-      { t: T_SINK, sfx: 'drop', gain: 0.6, haptic: [0.35, 60] },
-      { t: T_BEGIN, sfx: 'hatch', gain: 0.7, haptic: [0.4, 50] },
+      { t: T_SPIN, sfx: 'whoosh', gain: 0.5 },
+      { t: T_DARK, sfx: 'switch', gain: 0.5 },
+      { t: T_BEGIN, sfx: 'key', gain: 0.6, haptic: [0.3, 40] },
     ];
   },
 };
-function bl() { return 4.25; }

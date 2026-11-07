@@ -75,7 +75,7 @@ const toCol = (c) => new THREE.Color(typeof c === 'string' && NAMED[c] !== undef
 //   str: text ('\n' = new line, all caps are used)
 //   cap: cap height in metres (default 1)
 //   color: default colour ('gold'|'cream'|'rust'|hex), colors: { wordIndex: colour } overrides
-//   align: 'center'|'left'|'right' (default center), vAlign: 'middle'|'baseline'|'top'
+//   align: 'center'|'left'|'right' (default center), vAlign: 'middle'|'baseline'|'top'|'bottom'
 //   tracking: extra letter spacing in em (default 0.02), lineGap: em (default 1.15)
 //   times: array of reveal times, one per word (or a single number = all at once). Missing = shown.
 //   out: time the whole line leaves (slides down/fades over outDur, default 0.25)
@@ -136,6 +136,7 @@ export function makeText(str, opts = {}, SU) {
   const va = opts.vAlign ?? 'middle';
   if (va === 'middle') dy = -cap / 2 + ((nL - 1) * lineGap) / 2;
   else if (va === 'top') dy = -cap;
+  else if (va === 'bottom') dy = (nL - 1) * lineGap; // last baseline at the anchor, the block grows upward
   if (dy) { for (let i = 1; i < pos.length; i += 3) pos[i] += dy; for (let i = 1; i < wc.length; i += 2) wc[i] += dy; for (const w of words) { w.y0 += dy; w.y1 += dy; } }
 
   const geo = new THREE.BufferGeometry();
