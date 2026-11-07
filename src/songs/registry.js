@@ -5,9 +5,10 @@
 // the show is picked by that key first, then by the song id.
 import gold from './gold-on-the-wire.js';
 import copperLine from './copper/show.js';
+import blackBox from './blackbox/show.js';
 import generic from './generic.js';
 
-const SHOWS = { 'gold-on-the-wire': gold, 'copper-line': copperLine };
+const SHOWS = { 'gold-on-the-wire': gold, 'copper-line': copperLine, 'black-box': blackBox };
 
 export function showFor(song) {
   return (song.show && SHOWS[song.show]) || SHOWS[song.id] || generic;

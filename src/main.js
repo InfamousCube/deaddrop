@@ -278,6 +278,8 @@ function heldTape() { return interact.anyHeldTape(); }
 function startPreview(tape) {
   G.previewTape = tape;
   tape.spin = 1;
+  // a show may prebuild its worlds while its tape is in the hand (no hitch when the song starts)
+  try { showFor(tape.song).prepare?.(ctxFor(tape.song.id)); } catch (e) { console.warn('show prepare', e); }
   if (!audio.songs.has(tape.id)) { G.pendingPreview = tape; return; }
   audio.previewStart(tape.id, tape.song.preview.start, tape.song.preview.end);
 }
@@ -413,6 +415,7 @@ function insertFinish(tape, delay) {
   const song = tape.song;
   G.song = song;
   G.show = showFor(song);
+  try { G.show.prepare?.(ctxFor(song.id)); } catch (e) { console.warn('show prepare', e); }
   after(delay, () => {
     deck.pressKey('play', true);
     audio.oneShot('key', deck.snapCenter, 0.9);
@@ -428,7 +431,7 @@ function insertFinish(tape, delay) {
     G.evIdx = 0;
     G.songT = -0.12;
     audio.ambience(0.15, 1.2);
-    world.setTitle(song.id, { title: song.title, sub: song.artist.toUpperCase(), top: `${song.label.catalog} · SIDE A` }, song.label.foil);
+    world.setTitle(song.id, { title: song.songTitle || song.title, sub: song.artist.toUpperCase(), top: `${song.label.catalog} · SIDE A` }, song.label.foil);
     if (audio.songs.has(song.id)) audio.playSong(song.id, { delay: 0.12 });
     setState('song');
   });

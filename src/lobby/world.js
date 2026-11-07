@@ -29,7 +29,8 @@ const EXTRA_TAPES = [
     label: { paper: '#e6dac0', ink: '#141920', accent: '#a86428', foil: '#e0a527', stripe: '#a86428', catalog: 'DD-002' },
   },
   {
-    title: 'Black Box',
+    title: 'Black Box', // tape name only: the song (and every title in its show) is "Gold on the Wire"
+    show: 'black-box', // own show (songs/blackbox/show.js)
     preview: { start: 47.8, end: 76.5 },
     label: { paper: '#d8e0dc', ink: '#0e1318', accent: '#1f5a5e', foil: '#58b89c', stripe: '#d9a93a', catalog: 'DD-003' },
   },
@@ -77,7 +78,8 @@ export class World {
         const ex = EXTRA_TAPES[i];
         const spec = {
           ...base,
-          title: ex.title,
+          title: ex.title, // label name of this tape
+          songTitle: base.title, // the song on it stays the same
           preview: ex.preview,
           label: ex.label,
         };

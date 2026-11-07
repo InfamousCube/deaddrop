@@ -517,12 +517,12 @@ export function buildCity() {
   // ---- title sign on the building that closes the avenue ----
   const sign = new THREE.Group();
   {
-    const word = 'COPPER LINE';
+    const word = 'GOLD ON THE WIRE'; // the song's title (the tape label says "Copper Line")
     const { tex, n } = letterStrip(word, { cell: 256 });
-    const lw = 0.56, lh = 0.8, gap = 0.03;
+    const lw = 0.4, lh = 0.57, gap = 0.03;
     const total = n * (lw + gap);
     const pos = [], uv = [], on = [], idx = [], id = [];
-    const order = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10];
+    const order = [...word].map((c, i) => (c === ' ' ? -1 : i)).filter((i) => i >= 0);
     [...word].forEach((ch, i) => {
       if (ch === ' ') return;
       const x0 = -total / 2 + i * (lw + gap), x1 = x0 + lw;
@@ -549,12 +549,13 @@ export function buildCity() {
     // lattice frame behind the letters: posts, two rails and X braces
     const fb = new Batch();
     const nb = 10, bw = total / nb;
-    for (let k = 0; k <= nb; k++) fb.add(paint(G.box(0.018, 1.04, 0.018), 0x1a1d22, { m: xf([-total / 2 + k * bw, 0.52, -0.03]) }));
+    const top = 0.2 + lh; // top rail just above the letters
+    for (let k = 0; k <= nb; k++) fb.add(paint(G.box(0.018, top + 0.04, 0.018), 0x1a1d22, { m: xf([-total / 2 + k * bw, (top + 0.04) / 2, -0.03]) }));
     for (let k = 0; k < nb; k++) {
-      const x = -total / 2 + (k + 0.5) * bw, len = Math.hypot(bw, 0.8), ang = Math.atan2(0.8, bw);
-      for (const sgn of [1, -1]) fb.add(paint(G.box(len, 0.01, 0.01), 0x1a1d22, { m: xf([x, 0.56, -0.05], [0, 0, ang * sgn]) }));
+      const span = top - 0.14, x = -total / 2 + (k + 0.5) * bw, len = Math.hypot(bw, span), ang = Math.atan2(span, bw);
+      for (const sgn of [1, -1]) fb.add(paint(G.box(len, 0.01, 0.01), 0x1a1d22, { m: xf([x, (top + 0.14) / 2, -0.05], [0, 0, ang * sgn]) }));
     }
-    for (const y of [0.14, 1.0]) fb.add(paint(G.box(total + 0.04, 0.025, 0.035), 0x1a1d22, { m: xf([0, y, -0.03]) }));
+    for (const y of [0.14, top]) fb.add(paint(G.box(total + 0.04, 0.025, 0.035), 0x1a1d22, { m: xf([0, y, -0.03]) }));
     sign.add(fb.build(poster()));
   }
   sign.position.set(CITY.title.x, CITY.title.h, CITY.title.z + 0.2);
