@@ -70,6 +70,8 @@ class BlackBox {
     makeText('GOLD ON THE WIRE', { cap: 0.1 }); // builds the glyph atlas now
     this.core = true;
     this.warm(root); // dome, cradle and flash shell programs
+    // read-only debug export for tools/lyriccheck.mjs: builds every scene, returns [{ sc, T }] for every text block
+    if (typeof window !== 'undefined') window.__bbTexts = () => { for (const sc of this.scenes) this.ensure(sc); return this.scenes.flatMap((sc) => sc.kit._texts.map((T) => ({ sc, T }))); };
 
   }
 
@@ -91,6 +93,7 @@ class BlackBox {
         const opts = { ...o };
         if (opts.times === undefined && opts.near !== undefined) opts.times = self.words.times(opts.say ?? str.replace(/\n/g, ' '), opts.near);
         const T = makeText(str, opts, SU);
+        T.dbg = { str, scene: sc.id, near: o.near, say: o.say, given: o.times !== undefined }; // read-only, for tools/lyriccheck.mjs
         texts.push(T);
         if (o.at) kit.place(T.mesh, o.at);
         (o.parent || group).add(T.mesh);

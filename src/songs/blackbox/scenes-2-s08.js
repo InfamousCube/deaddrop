@@ -1,177 +1,291 @@
-// S08 The bomb chamber and the gold harp (56.61 to 67.74, hot). Clean rework, one shot:
-//   HERO a colossal 1960s time bomb ahead: seven crimson sticks, black straps, a black timer with two cream digits.
-//   SUPPORT 1 eight thick gold harp columns in a ring around the player (two flank the bomb, the rest sides/back).
-//   SUPPORT 2 the gold wire from the timer up into the dark, and the black wire-cutters that swing in and cut it.
-//   PALETTE carmine dome (the field) + black floor + crimson bomb, gold accent, cream digits.
-//   MOTION the countdown (03 02 01 00), then the cutters swing in and snip; later the columns are plucked.
-//   ACCENT one spark burst at the cut; sunburst rays only on "tonight" and the two post-chorus "gold" hits.
-//   LYRIC one block at a time, low centre over the plain floor under the bomb.
-//   Out: EDGE-MODE at 67.74 (cyan outlines of bomb and harp for 0.4 s while S09 fills in).
+// S08 The time bomb and the vault door (56.30 to 67.95, hot). Round 3, STORYBOARD-v3.
+// SHOT CARD
+//   HERO     a round bank-vault door (7 m, 0.85 m thick) in a black wall: stepped carmine rims with gold
+//            bevel rings, a 6-spoke gold handwheel, 24 gold locking-bolt heads round the edge, a massive
+//            hinge on the left. Strapped under the handwheel: a time bomb (six crimson dynamite sticks
+//            with cream paper caps and black tape, a twin-bell alarm clock on top, a flip counter in
+//            front, three loops of wire: crimson, cream, gold).
+//   AROUND   an antechamber: fluted columns (black, gold rim) left and right, three cone-shade lamps
+//            hanging over the door with soft gold light cones; behind you the dark.
+//   BEATS    "count down to zero" = counter 03 02 01 00, the bells ring and the clock shakes; "don't ask
+//            me why" = side cutters glide in and hesitate between the wires (WHY redacted); "gold" = the
+//            jaws close on the gold wire, "wire" = SNIP (spark), "tonight" = the ringing stops; "oh-oh" =
+//            the bolts retract in a wave, the handwheel spins, the gap glows gold; "gold on the wire" =
+//            the door swings open inward on its hinge, gold light floods out; you glide through the ring.
+//   OUT      FLY-THROUGH THE DOOR (S09 pre 0.5): the ring passes around you (>= 2.5 m), the gold light
+//            dies, dark steel beyond. post 0.8: the leaf beside you fades to black.
+//   PALETTE  black wall, carmine door, gold bolts/rims/wheel, crimson dynamite, cream clock.
+//   LYRICS   one block at a time left of the bomb (az -27, d 4.2); the counter is the hero's display.
 import * as THREE from 'three';
 import { PAL } from './style.js';
-import { sm, env, merge, shapeOf, slab } from './scenes-2-util.js';
+import { D2R, EYE, sm, env, clamp01, wt, xf, merge, lathe, ext, tube, cyl, shapeOf, ringShape, roundRect } from './scenes-2-util.js';
 
-const FY = -4; // floor (y)
-const BS = 1.25; // bomb scale
-const BZ = -26; // bomb (world z before travel)
-const C = [8, 6.5, -21]; // cut point on the gold wire (world, before travel)
-const HARP_AZ = [38, -38, 80, -80, 125, -125, 170, -170];
-const PLUCK = [64.0, 64.59, 66.72, 67.19];
-const SWEEP = [60.62, 61.18, 61.75, 62.32];
+const T0 = 56.3, T1 = 67.95;
+const R = 3.5, TH = 0.85, DCY = 2.6, GY = -1.8, STOP = 5.3, DX = 0.6;
+const KEY = [-0.25, 0.7, 0.67];
 
 export const S08 = {
-  id: 'S08', t0: 56.61, t1: 67.74, world: 'hot', pre: 0, post: 0.4, // pre 0: the bomb stood over S07's spy and lyric
-  key: [0.35, 0.45, 0.82],
-  fog: { color: PAL.velvet, near: 60, far: 200 },
-  sky: { zen: PAL.carmine, hor2: PAL.carmine, hor: PAL.carmine, nadir: PAL.velvet, rayA: PAL.crimson, rayB: PAL.carmineDeep, rays: 0, rings: 0 },
-
+  id: 'S08', t0: 56.3, t1: 67.95, world: 'hot', pre: 0, post: 0.4,
+  key: KEY,
+  fog: { color: PAL.black, near: 14, far: 50 },
+  sky: 'black',
   build(kit) {
-    const s = { m: new THREE.Matrix4(), c: new THREE.Color(), cDim: new THREE.Color(PAL.brass), cLit: new THREE.Color(PAL.goldHi), cGold: new THREE.Color(PAL.gold) };
-    s.prof = kit.travel([[56.61, 2, 1.0], [58.6, 0, 1.4]]);
-    s.W = new THREE.Group(); s.W.name = 's08-world';
-    kit.group.add(s.W);
-    const black = kit.toon({ ramp: 'black', rim: PAL.gold, rimTh: 0.6 });
+    const s = { v: new THREE.Vector3(), m: new THREE.Matrix4(), q: new THREE.Quaternion(), sc: new THREE.Vector3() };
+    const ct = (i) => wt(kit, 'count down to zero', 56.52, i);
+    s.cnt = [ct(0), ct(1), ct(2), ct(3)];
+    s.dont = wt(kit, "don't ask me why", 58.48, 0); s.why = wt(kit, "don't ask me why", 58.48, 3);
+    s.g1 = wt(kit, 'gold on the wire tonight', 60.2, 0); s.w1 = wt(kit, 'gold on the wire tonight', 60.2, 3); s.tonight = wt(kit, 'gold on the wire tonight', 60.2, 4);
+    s.oh1 = wt(kit, 'oh-oh', 64.0, 0);
+    s.g2 = wt(kit, 'oh-oh gold on the wire', 64.0, 1); s.w2 = wt(kit, 'oh-oh gold on the wire', 64.0, 4);
+    s.oh2 = wt(kit, 'oh-oh', 66.4, 0);
+    s.prof = kit.travel([[T0, 0.5, 0.01], [56.7, 0, 1.2], [s.g2 - 0.05, 3, 1.2], [66.9, 2, 1.0]]);
+    const DZ = -(STOP + s.prof.d(s.g2 - 0.06));      // door front plane (world group coords)
+    s.DZ = DZ;
+    const W = (s.W = new THREE.Group());
+    kit.group.add(W);
+    s.side = [];
 
-    // floor: one plain black disc (the readable ground under the carmine dome)
-    s.floor = new THREE.Mesh(new THREE.CircleGeometry(90, 40).rotateX(-Math.PI / 2), kit.flat({ color: PAL.velvet }));
-    s.floor.position.y = FY;
-    kit.group.add(s.floor);
+    const black = kit.toon({ ramp: 'black', rim: PAL.gold, key: KEY });
+    const carm = kit.toon({ ramp: 'hot', rim: PAL.gold, key: KEY });
+    const goldM = kit.toon({ ramp: 'gold', rim: PAL.goldHi, key: KEY });
+    const cream = kit.toon({ ramp: 'cream', rim: PAL.gold, key: KEY });
+    const crimM = kit.toon({ ramp: [PAL.carmineDeep, PAL.carmine, PAL.crimson], rim: PAL.gold, key: KEY });
+    s.leafMats = [carm, goldM, cream, crimM];
 
-    // ---- the bomb ----
-    s.B = new THREE.Group();
-    s.B.position.set(0, FY, BZ);
-    s.B.scale.setScalar(BS);
-    s.W.add(s.B);
-    const sticks = [];
-    const stick = () => new THREE.CylinderGeometry(0.95, 0.95, 12, 10, 1).translate(0, 6, 0);
-    sticks.push(stick());
-    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2 + Math.PI / 6; sticks.push(stick().translate(Math.sin(a) * 1.95, 0, Math.cos(a) * 1.95)); }
-    s.B.add(new THREE.Mesh(merge(sticks), kit.toon({ ramp: 'hot', rim: null })));
-    s.B.add(new THREE.Mesh(merge([2.2, 6.2, 10.2].map((y) => new THREE.CylinderGeometry(3.05, 3.05, 0.75, 12, 1).translate(0, y, 0))), kit.toon({ ramp: 'black', rim: null })));
-    s.box = new THREE.Mesh(new THREE.BoxGeometry(5.4, 2.8, 1.2), kit.toon({ ramp: 'black', rim: null }));
-    s.box.position.set(0, 5.0, 3.4);
-    s.B.add(s.box);
+    // wall with the round opening + bevelled gold frame ring + floor, side walls, coffered ceiling
+    const wallS = shapeOf([[-20, GY - 1], [20, GY - 1], [20, 14], [-20, 14]]);
+    wallS.holes.push(new THREE.Path().absarc(DX, DCY, R + 0.12, 0, Math.PI * 2, true));
+    s.wall = new THREE.Mesh(new THREE.ShapeGeometry(wallS, 48).translate(0, 0, DZ - 0.3), black);
+    s.frame = new THREE.Mesh(merge([ext(ringShape(R + 0.1, R + 0.95, 64), 0.7, 0.1, 2), ext(ringShape(R + 0.95, R + 1.25, 64), 0.4, 0.06, 2).translate(0, 0, -0.2)]).translate(DX, DCY, DZ - 0.1), black);
+    const room = new THREE.Mesh(merge([
+      new THREE.PlaneGeometry(22, 30).rotateX(-Math.PI / 2).translate(0, GY, DZ + 12),
+      ...[-1, 1].map((k) => new THREE.PlaneGeometry(30, 12).rotateY(-k * Math.PI / 2).translate(k * 9.5, GY + 6, DZ + 12)),
+    ]), kit.flat({ color: PAL.velvet }));
+    const cof = shapeOf([[-9.5, -1], [9.5, -1], [9.5, 25], [-9.5, 25]]);
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 6; j++) cof.holes.push(roundRect(3.4, 3.4, 0.2, -6 + i * 4, 1.4 + j * 4, new THREE.Path()));
+    const ceil = new THREE.Mesh(merge([xf(ext(cof, 0.45, 0.06, 2), [0, 7.6, DZ], [Math.PI / 2, 0, 0]), new THREE.PlaneGeometry(20, 28).rotateX(Math.PI / 2).translate(0, 8.4, DZ + 12)]), black);
+    // fluted columns (16 flutes) with lathe base and capital, two per side
+    const fl = [];
+    for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2, r = i % 2 ? 0.48 : 0.58; fl.push([Math.cos(a) * r, Math.sin(a) * r]); }
+    const shaftG = xf(ext(shapeOf(fl), 8.2, 0.03, 1), [0, GY + 0.8 + 4.1, 0], [Math.PI / 2, 0, 0]);
+    const baseG = lathe([[0, 0], [0.85, 0], [0.85, 0.3], [0.72, 0.42], [0.68, 0.6], [0.6, 0.8], [0, 0.8]], 18).translate(0, GY, 0);
+    const capG = lathe([[0, 0], [0.6, 0], [0.75, 0.25], [0.95, 0.45], [0.95, 0.75], [0, 0.75]], 18).translate(0, GY + 9.0, 0);
+    const colG = merge([shaftG, baseG, capG]);
+    s.cols = new THREE.InstancedMesh(colG, kit.toon({ ramp: 'black', rim: PAL.brassDark, rimAmt: 0.6, key: KEY }), 4);
+    [[-6.6, DZ + 1.6], [6.6, DZ + 1.6], [-7.2, DZ + 7.2], [7.2, DZ + 7.2]].forEach(([x, z], i) => s.cols.setMatrixAt(i, s.m.makeTranslation(x, 0, z)));
+    // three cone-shade lamps over the door, soft gold cones
+    const shadeG = merge([lathe([[0.12, 0.55], [0.3, 0.42], [0.62, 0.05], [0.75, 0], [0.7, -0.03], [0.55, 0.02], [0.24, 0.38], [0, 0.45]], 16), xf(cyl(0.03, 0.03, 4, 6), [0, 2.5, 0])]);
+    s.shades = new THREE.InstancedMesh(shadeG, black, 3);
+    s.bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.2, 10, 8), kit.flat({ color: PAL.goldHi }), 3);
+    s.cones = new THREE.InstancedMesh(cyl(2.4, 0.55, 5.2, 18).translate(0, -2.6, 0), kit.flat({ color: PAL.gold, opacity: 0.05, additive: true, side: THREE.DoubleSide, depthWrite: false }), 3);
+    [-3.2, 0, 3.2].forEach((x, i) => {
+      const y = 5.3 + (i === 1 ? 0.5 : 0), z = DZ + 1.4;
+      s.shades.setMatrixAt(i, s.m.makeTranslation(x, y, z));
+      s.bulbs.setMatrixAt(i, s.m.makeTranslation(x, y + 0.02, z));
+      s.cones.setMatrixAt(i, s.m.makeTranslation(x, y, z));
+    });
+    W.add(s.wall, s.frame, room, ceil, s.cols, s.shades, s.bulbs, s.cones);
+    s.side.push(room, ceil, s.cols, s.shades, s.bulbs, s.cones);
 
-    // ---- harp: eight thick gold columns around the player (one instanced mesh, colour per column) ----
-    s.harp = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 48, 0.5).translate(0, 24, 0), kit.flat({ color: PAL.white, fog: 0.5 }), HARP_AZ.length);
-    s.harp.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(HARP_AZ.length * 3).fill(1), 3);
-    s.harpP = HARP_AZ.map((az) => [Math.sin(az * Math.PI / 180) * 13, Math.cos(az * Math.PI / 180) * -13]);
-    s.harpP.forEach(([x, z], i) => s.harp.setMatrixAt(i, s.m.makeTranslation(x, FY, z)));
-    s.harp.frustumCulled = false;
-    kit.group.add(s.harp);
+    // ---- the door (pivot = hinge on the left; door space: centre at x = R + 0.25, front face z = 0) ---
+    s.hinge = new THREE.Group();
+    s.hinge.position.set(DX - (R + 0.25), DCY, DZ);
+    s.door = new THREE.Group();
+    s.door.position.x = R + 0.25;
+    s.hinge.add(s.door);
+    W.add(s.hinge);
+    const body = merge([
+      ext(ringShape(2.95, R, 64), TH, 0.06, 2).translate(0, 0, -TH / 2),
+      ext(ringShape(2.15, 2.95, 64), TH, 0.06, 2).translate(0, 0, -TH / 2 + 0.13),
+      ext(new THREE.Shape().absarc(0, 0, 2.15, 0, Math.PI * 2, false), TH, 0.06, 2).translate(0, 0, -TH / 2 + 0.24),
+    ]);
+    s.door.add(new THREE.Mesh(body, carm));
+    s.door.add(new THREE.Mesh(xf(new THREE.TorusGeometry(R - 0.04, 0.07, 6, 64), [0, 0, 0.04]), goldM));
+    // back face: four locking bars and a gear box
+    const back = [];
+    for (let k = 0; k < 4; k++) back.push(xf(new THREE.BoxGeometry(5.6 - Math.abs(k - 1.5) * 1.2, 0.28, 0.22), [0, -1.5 + k, -TH - 0.05]));
+    back.push(xf(new THREE.BoxGeometry(1.6, 1.4, 0.5), [0, 0, -TH - 0.2]));
+    s.door.add(new THREE.Mesh(merge(back), black));
+    // 24 locking-bolt heads round the edge (they retract in a wave)
+    s.bolts = new THREE.InstancedMesh(xf(cyl(0.22, 0.22, 0.34, 10), [0, 0, 0], [Math.PI / 2, 0, 0]), goldM, 18);
+    s.door.add(s.bolts);
+    // handwheel: rim, 6 spokes with knobs, hub
+    const hw = [xf(new THREE.TorusGeometry(0.9, 0.085, 8, 36), [0, 0, 0]), xf(cyl(0.24, 0.24, 0.3, 14), [0, 0, 0], [Math.PI / 2, 0, 0])];
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      hw.push(xf(cyl(0.05, 0.05, 1.1, 6), [Math.cos(a) * 0.55, Math.sin(a) * 0.55, 0], [0, 0, a - Math.PI / 2]));
+      hw.push(new THREE.SphereGeometry(0.12, 8, 6).translate(Math.cos(a) * 1.08, Math.sin(a) * 1.08, 0));
+    }
+    s.wheel = new THREE.Mesh(merge(hw), goldM);
+    s.wheel.position.set(0, 0.35, 0.65);
+    s.door.add(s.wheel, new THREE.Mesh(xf(cyl(0.12, 0.12, 0.45, 8), [0, 0.35, 0.45], [Math.PI / 2, 0, 0]), goldM));
+    // hinge: two knuckles, the pin and the arms
+    const hg = [xf(cyl(0.12, 0.12, 6.4, 10), [-0.1, 0, 0.35]), ...[-1.6, 1.6].map((y) => xf(cyl(0.34, 0.34, 1.1, 14), [-0.1, y, 0.35])), ...[-1.6, 1.6].map((y) => xf(new THREE.BoxGeometry(1.6, 0.5, 0.3), [0.75, y, 0.3]))];
+    s.hinge.add(new THREE.Mesh(merge(hg), black));
 
-    // edge-mode outlines (built before any text is parented to the bomb)
-    s.edgesB = kit.edges(s.B, { color: PAL.cyan, threshold: 40 }); s.W.add(s.edgesB);
-    s.edgesH = kit.edges(s.harp, { color: PAL.cyan, threshold: 40 }); kit.group.add(s.edgesH);
-
-    // timer digits on the box face
-    s.digits = [['03', 56.3, 57.0], ['02', 57.0, 57.3], ['01', 57.3, 57.5], ['00', 57.5, 59.96]].map(([str, a, b]) => {
-      const T = kit.text(str, { cap: 1.9, color: 'cream', times: [a], dur: 0.01, out: b, outDur: 0.01, parent: s.box });
-      T.mesh.position.set(0, 0, 0.62);
+    // ---- the bomb (door space; centre column x 0) ----------------------------------------------------
+    const B = new THREE.Group();
+    B.position.set(0, -2.05, 0.24);
+    s.door.add(B);
+    const sticks = [], caps = [];
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 2; k++) {
+      const y = -0.3 + r * 0.25, z = 0.13 + k * 0.25;
+      sticks.push(xf(cyl(0.12, 0.12, 1.2, 12), [0, y, z], [0, 0, Math.PI / 2]));
+      for (const sx of [-1, 1]) caps.push(xf(cyl(0.115, 0.115, 0.05, 12), [sx * 0.61, y, z], [0, 0, Math.PI / 2]));
+    }
+    B.add(new THREE.Mesh(merge(sticks), crimM), new THREE.Mesh(merge(caps), cream));
+    const tape = [-0.36, 0.36].map((x) => xf(ext(roundRect(0.66, 0.86, 0.12), 0.14, 0.02, 3), [x, -0.05, 0.25], [0, Math.PI / 2, 0]));
+    // flip counter housing in front (black, two flap halves)
+    tape.push(xf(ext(roundRect(0.7, 0.5, 0.06), 0.24, 0.03, 3), [0, -0.05, 0.64]));
+    B.add(new THREE.Mesh(merge(tape), black));
+    // twin-bell alarm clock on top (case faces you), bells, hammer, feet
+    s.clock = new THREE.Group();
+    s.clock.position.set(0, 0.72, 0.3);
+    B.add(s.clock);
+    const caseG = xf(lathe([[0, -0.16], [0.3, -0.16], [0.35, -0.12], [0.36, 0.1], [0.32, 0.16], [0, 0.16]], 22), [0, 0, 0], [Math.PI / 2, 0, 0]);
+    const bellG = lathe([[0, 0.17], [0.09, 0.15], [0.15, 0.08], [0.17, 0], [0, 0]], 12);
+    const bells = [-1, 1].map((sx) => xf(bellG.clone(), [sx * 0.2, 0.36, 0], [0, 0, -sx * 0.45]));
+    const legs = [-1, 1].map((sx) => xf(new THREE.SphereGeometry(0.06, 8, 6), [sx * 0.2, -0.36, 0]));
+    s.clock.add(new THREE.Mesh(merge([caseG, ...bells, ...legs, xf(cyl(0.03, 0.03, 0.2, 6), [0, 0.42, 0])]), goldM));
+    s.clock.add(new THREE.Mesh(new THREE.CircleGeometry(0.28, 24).translate(0, 0, 0.17), kit.flat({ color: PAL.cream })));
+    s.clock.add(new THREE.Mesh(merge([xf(new THREE.BoxGeometry(0.035, 0.22, 0.02), [0, 0.09, 0.18]), xf(new THREE.BoxGeometry(0.035, 0.15, 0.02), [0.05, 0.03, 0.185], [0, 0, -1.1])]), kit.flat({ color: PAL.black })));
+    s.hammer = new THREE.Mesh(merge([xf(cyl(0.02, 0.02, 0.2, 5), [0, 0.1, 0]), new THREE.SphereGeometry(0.05, 6, 5).translate(0, 0.2, 0)]), goldM);
+    s.hammer.position.set(0, 0.3, 0.02);
+    s.clock.add(s.hammer);
+    // the three wires (crimson, cream, gold) looping from the clock to the stick ends on the right
+    const WIRES = {
+      crimson: [[0.2, 0.56, 0.38], [0.6, 0.46, 0.75], [0.92, 0.18, 0.78], [0.66, -0.12, 0.5]],
+      cream: [[0.24, 0.5, 0.36], [0.7, 0.3, 0.95], [1.05, -0.06, 0.9], [0.68, -0.3, 0.52]],
+      gold: [[0.26, 0.44, 0.34], [0.78, 0.12, 1.12], [1.16, -0.32, 1.02], [0.7, -0.48, 0.5]],
+    };
+    const curve = (pts) => new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)));
+    B.add(new THREE.Mesh(new THREE.TubeGeometry(curve(WIRES.crimson), 24, 0.06, 6), kit.flat({ color: PAL.crimson })));
+    B.add(new THREE.Mesh(new THREE.TubeGeometry(curve(WIRES.cream), 24, 0.06, 6), kit.flat({ color: PAL.cream })));
+    const gc = curve(WIRES.gold), half = (a, b) => { const P = []; for (let i = 0; i <= 12; i++) P.push(gc.getPoint(a + ((b - a) * i) / 12)); return P; };
+    const gA = half(0, 0.5), gB = half(0.5, 1);
+    s.cut = gc.getPoint(0.5);
+    const goldWire = kit.flat({ color: PAL.gold });
+    s.wA = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(gA), 14, 0.065, 6).translate(-gA[0].x, -gA[0].y, -gA[0].z), goldWire);
+    s.wA.position.copy(gA[0]);
+    s.wB = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(gB), 14, 0.065, 6).translate(-gB[12].x, -gB[12].y, -gB[12].z), goldWire);
+    s.wB.position.copy(gB[12]);
+    B.add(s.wA, s.wB);
+    s.hover = [curve(WIRES.crimson).getPoint(0.5), curve(WIRES.cream).getPoint(0.5), s.cut];
+    s.B = B;
+    // side cutters: two bevelled halves round a rivet, crimson-dipped handles
+    const jaw = shapeOf([[-0.44, 0.0], [-0.05, -0.02], [0.0, -0.09], [0.09, -0.06], [0.45, 0.02], [0.92, 0.1], [0.95, 0.18], [0.5, 0.16], [0.1, 0.12], [0.0, 0.11], [-0.2, 0.08], [-0.36, 0.05]]);
+    const grip = shapeOf([[0.34, -0.0], [0.9, 0.07], [0.99, 0.14], [0.96, 0.23], [0.34, 0.19]]);
+    const steel = kit.toon({ ramp: [PAL.velvet, PAL.creamDark, PAL.cream], rim: PAL.gold, key: KEY, side: THREE.DoubleSide });
+    const gripM = kit.toon({ ramp: [PAL.carmineDeep, PAL.carmine, PAL.crimson], rim: PAL.gold, key: KEY, side: THREE.DoubleSide });
+    const halfG = (sy) => {
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(xf(ext(jaw, 0.06, 0.015, 2), [0, 0, 0], [0, 0, 0], [0.62, 0.62 * sy, 1]), steel));
+      g.add(new THREE.Mesh(xf(ext(grip, 0.1, 0.02, 2), [0, 0, 0], [0, 0, 0], [0.62, 0.62 * sy, 1]), gripM));
+      return g;
+    };
+    s.cutters = new THREE.Group();
+    s.cutU = halfG(1); s.cutL = halfG(-1);
+    s.cutU.position.z = 0.05; s.cutL.position.z = -0.05;
+    s.cutters.add(s.cutU, s.cutL, new THREE.Mesh(xf(cyl(0.05, 0.05, 0.22, 10), [0, 0, 0], [Math.PI / 2, 0, 0]), goldM));
+    B.add(s.cutters);
+    s.spark = kit.particles({
+      n: 14, shape: 'tri', size: 0.09, color: PAL.goldHi, additive: true,
+      init: (i, r) => ({ p: [s.cut.x, s.cut.y, s.cut.z], v: [(r() - 0.3) * 3, (r() - 0.2) * 3, 1 + r() * 2], g: [0, -6, 0], t0: s.w1, life: 0.5 + r() * 0.3, s: 0.06 + r() * 0.07 }),
+    });
+    B.add(s.spark);
+    // counter digits (the hero's display): 03 02 01 00 on the word times
+    s.digits = ['03', '02', '01', '00'].map((dg, i) => {
+      const T = kit.text(dg, { cap: 0.3, color: 'cream', times: [s.cnt[i]], out: i < 3 ? s.cnt[i + 1] : Infinity, outDur: 0.02, dur: 0.05, pop: true, parent: B, slant: 0 });
+      T.mesh.position.set(0, -0.05, 0.79);
       return T;
     });
+    // bolt-gap glow and the gold light behind the door
+    s.gap = new THREE.Mesh(ext(ringShape(R - 0.02, R + 0.14, 64), 0.05, 0, 2).translate(DX, DCY, DZ + 0.05), kit.flat({ color: PAL.goldHi }));
+    // Round 4: behind the open door the strongroom floor glows gold and two stacks of tapered gold bars stand on
+    // each side (the old flat gold disc filled the frame and read as a sun or a coin)
+    const FLY = DCY - R + 0.15;
+    s.light = new THREE.Mesh(new THREE.PlaneGeometry(9, 26).rotateX(-Math.PI / 2).translate(DX, FLY, DZ - 13.4), kit.flat({ color: PAL.brass }));
+    const ingot = new THREE.CylinderGeometry(0.36, 0.48, 0.3, 4, 1).rotateY(Math.PI / 4).scale(0.75, 1, 1.6).toNonIndexed();
+    ingot.computeVertexNormals();
+    const IG = [];
+    for (const sx of [-1, 1]) for (const z of [-3.2]) for (let k = 0; k < 2; k++) for (let j = 0; j < 2 - k; j++) IG.push([DX + sx * 1.75 + (j - (1 - k) / 2) * 0.56, FLY + 0.15 + k * 0.3, DZ + z]);
+    s.ingots = new THREE.InstancedMesh(ingot, kit.toon({ ramp: [PAL.brass, PAL.gold, PAL.goldHi], rim: null, key: KEY }), IG.length);
+    IG.forEach(([x, y, z], i) => s.ingots.setMatrixAt(i, s.m.makeTranslation(x, y, z)));
+    W.add(s.gap, s.light, s.ingots);
 
-    // ---- the gold wire: lower part (droops after the cut) and upper part (whips up) ----
-    const gold = kit.flat({ color: PAL.gold });
-    const A = new THREE.Vector3(2.7 * BS, FY + 4.4 * BS, BZ + 3.4 * BS);
-    s.lowerG = new THREE.Group(); s.lowerG.position.copy(A);
-    const lower = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(2.2, 0.6, 0.2), new THREE.Vector3(3.9, 2.2, 0.3), new THREE.Vector3(C[0] - A.x, C[1] - A.y, C[2] - A.z)]);
-    s.lowerG.add(new THREE.Mesh(new THREE.TubeGeometry(lower, 16, 0.32, 6), gold));
-    s.W.add(s.lowerG);
-    const upper = new THREE.CatmullRomCurve3([new THREE.Vector3(...C), new THREE.Vector3(9.5, 14, -20), new THREE.Vector3(10.5, 30, -17), new THREE.Vector3(11, 52, -14)]);
-    s.upper = new THREE.Mesh(new THREE.TubeGeometry(upper, 20, 0.32, 6), gold);
-    s.W.add(s.upper);
-
-    // ---- the wire-cutters: two big black blades with gold rims, pivot above right of the cut ----
-    const blade = shapeOf([[-3.4, -1.3], [0, -0.75], [9.2, 0.05], [0, 0.75], [-3.4, 1.3], [-4.6, 0]]);
-    const bg = slab(blade, 0.5, 0);
-    s.cut = new THREE.Group();
-    s.bladeA = new THREE.Mesh(bg, black); s.bladeB = new THREE.Mesh(bg, black);
-    s.bladeA.position.z = 0.3; s.bladeB.position.z = -0.3;
-    s.cut.add(s.bladeA, s.bladeB);
-    s.cut.scale.setScalar(1.4);
-    s.P = new THREE.Vector3(C[0] + 10.6, C[1] + 2.4, C[2] + 0.5); // the blades point left at the wire
-    s.cut.rotation.z = Math.atan2(C[1] - s.P.y, C[0] - s.P.x);
-    s.W.add(s.cut);
-    s.sparks = kit.particles({
-      n: 22, shape: 'stroke', size: 0.8, fog: 0.2, seed: 81,
-      init: (i, r) => { const a = r() * Math.PI * 2, sp = 6 + r() * 9; return { p: [0, 0, 0], v: [Math.cos(a) * sp, Math.sin(a) * sp + 2, (r() - 0.2) * 4], g: [0, -12, 0], t0: 59.96, life: 0.4 + r() * 0.3, s: 0.5 + r() * 0.6, c: r() < 0.5 ? PAL.white : PAL.goldHi }; },
-    });
-    s.sparks.position.set(...C);
-    s.W.add(s.sparks);
-
-    // ---- lyric blocks: one at a time, low centre over the plain floor ----
-    const at = { d: 6, az: 0, y: -1.0 };
-    s.l1 = kit.text('COUNT DOWN TO ZERO,', { cap: 0.7, color: 'gold', times: [56.52, 57.0, 57.3, 57.5], out: 58.4, outDur: 0.06, at });
-    s.l2 = kit.text("DON'T ASK ME WHY", { cap: 0.72, color: 'cream', times: [58.48, 59.4, 59.6, 59.84], out: 60.0, outDur: 0.1, at });
-    s.l2.redact(3, 59.84);
-    s.l3 = kit.text('GOLD ON THE WIRE', { cap: 0.85, color: 'gold', times: [60.05, 61.52, 61.86, 62.08], out: 62.56, outDur: 0.05, at });
-    s.l4 = kit.text('TONIGHT', { cap: 1.25, color: 'cream', times: [62.62], pop: true, dur: 0.18, out: 63.9, outDur: 0.12, at: { d: 6, az: 0, y: -0.85 } });
-    s.l5 = kit.text('OH-OH,\nGOLD ON THE WIRE', { cap: 0.7, color: 'gold', colors: { 1: 'cream', 2: 'cream', 3: 'cream', 4: 'cream' }, times: [64.0, 64.94, 65.44, 65.68, 65.74], out: 66.6, outDur: 0.08, at });
-    s.l6 = kit.text('OH-OH,\nGOLD ON THE WIRE', { cap: 0.7, color: 'gold', colors: { 1: 'cream', 2: 'cream', 3: 'cream', 4: 'cream' }, times: [66.72, 67.36, 67.42, 67.48, 67.54], out: 67.74, outDur: 0.02, at });
+    // ---- lyrics -------------------------------------------------------------------------------------
+    const L = { d: 4.2, az: -31, y: 1.3 };
+    kit.text('COUNT DOWN\nTO ZERO,', { cap: 0.5, color: 'gold', near: 56.52, out: 58.25, outDur: 0.15, at: L });
+    const why = kit.text("DON'T ASK\nME WHY", { cap: 0.5, color: 'cream', near: 58.48, out: 60.3, outDur: 0.15, at: L });
+    why.redact(3, s.why + 0.12);
+    kit.text('GOLD ON\nTHE WIRE', { cap: 0.5, color: 'gold', near: 60.3, say: 'gold on the wire', out: s.tonight - 0.2, outDur: 0.15, at: L });
+    kit.text('TONIGHT', { cap: 0.56, color: 'cream', near: 62.4, out: 63.6, outDur: 0.2, at: L });
+    kit.text('OH-OH,', { cap: 0.6, color: 'gold', near: 64.0, say: 'oh-oh', out: s.g2 - 0.12, outDur: 0.1, at: L });
+    kit.text('GOLD ON\nTHE WIRE', { cap: 0.5, color: 'crimson', near: 64.94, out: s.oh2 - 0.2, outDur: 0.15, depthTest: false, at: L });
+    kit.text('OH-OH', { cap: 0.6, color: 'crimson', near: 66.4, say: 'oh-oh', out: 67.3, outDur: 0.25, depthTest: false, at: { d: 4.2, az: -20, y: 1.5 } });
+    for (const o of [s.bolts, s.cols, s.shades, s.bulbs, s.cones, s.ingots]) o.frustumCulled = false;
     return s;
   },
-
   update(t, s, kit) {
-    const d = s.prof.d(t);
-    s.W.position.z = d;
-
-    // cutters: swing in from above right, hover, snip on "Gold", lift away
-    const inK = sm(58.33, 59.13, t), outK = sm(61.0, 62.2, t);
-    s.cut.visible = t > 58.2 && t < 62.3;
-    s.cut.position.set(s.P.x + 26 * (1 - inK) + 26 * outK, s.P.y + 3 * (1 - inK) + 8 * outK, s.P.z);
-    const open = 0.36 * (1 - sm(59.88, 59.97, t)) + 0.1 * sm(60.4, 60.9, t);
-    s.bladeA.rotation.z = open; s.bladeB.rotation.z = -open;
-    // the cut: the upper wire whips up, the lower end droops
-    s.upper.position.y = 46 * sm(59.96, 60.9, t);
-    s.lowerG.rotation.z = -0.85 * sm(59.96, 60.55, t);
-    s.sparks.visible = t >= 59.96 && t < 60.8;
-
-    // harp colours: dim brass, a quarter-turn light sweep per beat, gold from "tonight", flashes on the plucks
-    const a = s.harp.instanceColor.array;
-    let moved = false;
-    for (let i = 0; i < HARP_AZ.length; i++) {
-      const az = ((HARP_AZ[i] % 360) + 360) % 360; // 0 front, 90 right, 180 back, 270 left
-      const q = Math.floor(az / 90.0001);
-      const sw = env(t, SWEEP[q] + ((az % 90) / 90) * 0.5, 2.5);
-      let pl = 0, wob = 0;
-      for (const tp of PLUCK) { const e = env(t, tp + (i % 2) * 0.04, 3); pl = Math.max(pl, e); if (e > 0) wob += Math.sin((t - tp) * 44) * e; }
-      const base = sm(62.6, 62.75, t);
-      s.c.copy(s.cDim).lerp(s.cGold, Math.max(base, sw)).lerp(s.cLit, pl);
-      a[i * 3] = s.c.r; a[i * 3 + 1] = s.c.g; a[i * 3 + 2] = s.c.b;
-      const [x, z] = s.harpP[i];
-      const w = 0.35 * wob;
-      s.harp.setMatrixAt(i, s.m.makeTranslation(x + w * Math.cos(HARP_AZ[i] * Math.PI / 180), FY, z + w * Math.sin(HARP_AZ[i] * Math.PI / 180)));
-      if (w !== 0) moved = true;
+    s.W.position.z = s.prof.d(t);
+    for (const o of s.side) o.visible = t >= T0 - 0.1;
+    s.wall.visible = t >= T0 - 0.1;
+    // alarm: rings from "zero" to "tonight", the clock shakes, the hammer buzzes
+    const ring = t >= s.cnt[3] && t < s.tonight ? 1 : 0;
+    s.clock.rotation.z = ring * 0.05 * Math.sin(t * 47);
+    s.clock.position.y = 0.72 + ring * 0.015 * Math.abs(Math.sin(t * 31));
+    s.hammer.rotation.z = ring ? 0.5 * Math.sin(t * 60) : 0.08 * Math.sin((t - s.cnt[0]) * 30) * env(t, s.cnt[0], 3);
+    // cutters: glide in from the right, hesitate between the wires, close on the gold wire, snip, leave
+    const inK = sm(s.dont - 0.1, s.dont + 0.7, t), outK = sm(s.tonight + 0.1, s.tonight + 1.1, t);
+    s.cutters.visible = inK > 0.001 && outK < 0.999;
+    const ph = clamp01((t - (s.dont + 0.7)) / Math.max(0.5, s.g1 - s.dont - 0.7));
+    const hv = s.hover, k = ph * 2.2;
+    const tgt = s.v;
+    if (k < 1) tgt.copy(hv[0]).lerp(hv[1], sm(0.2, 0.8, k)); else tgt.copy(hv[1]).lerp(hv[2], sm(1.1, 1.9, k));
+    if (t >= s.g1) tgt.copy(hv[2]);
+    // the jaw tip sits on the target; the cutters point left (jaws toward the wire)
+    s.cutters.position.set(tgt.x + 0.27 + (1 - inK) * 2.6 + outK * 2.8, tgt.y + 0.02 + outK * 0.6, tgt.z + 0.12);
+    s.cutters.rotation.set(0, 0, 0.25 - 0.1 * Math.sin(t * 2.2) * (1 - sm(s.g1 - 0.3, s.g1, t)));
+    const openA = 0.36 * (1 - sm(s.g1, s.g1 + 0.35, t)) + 0.18 * sm(s.g1 + 0.4, s.w1 - 0.25, t) * (1 - sm(s.w1 - 0.06, s.w1, t)) + 0.3 * sm(s.w1 + 0.1, s.w1 + 0.4, t);
+    s.cutU.rotation.z = openA; s.cutL.rotation.z = -openA;
+    // SNIP: the two gold halves spring apart and droop
+    const snap = sm(s.w1, s.w1 + 0.35, t);
+    s.wA.rotation.set(-0.5 * snap, 0, 0.35 * snap);
+    s.wB.rotation.set(0.35 * snap, 0, -0.5 * snap);
+    // bolts retract in a wave round the rim on "oh-oh", the wheel spins, the gap glows
+    for (let i = 0; i < 18; i++) {
+      const a = (i / 18) * Math.PI * 2 + Math.PI / 2;
+      const k2 = sm(s.oh1 + (i / 18) * 0.75, s.oh1 + (i / 18) * 0.75 + 0.18, t);
+      const r = 3.22 - 0.25 * k2;
+      s.bolts.setMatrixAt(i, s.m.compose(s.v.set(Math.cos(a) * r, Math.sin(a) * r, 0.17 - 0.3 * k2), s.q.identity(), s.sc.set(1, 1, 1)));
     }
-    s.harp.instanceColor.needsUpdate = true;
-    s.harp.instanceMatrix.needsUpdate = moved || s.wasMoved;
-    s.wasMoved = moved;
-
-    // edge-mode out
-    const edge = t >= 67.74;
-    const eOn = edge ? 1 - sm(67.95, 68.14, t) : 0;
-    if (edge) kit.edge(1);
-    s.B.visible = s.harp.visible = !edge; // only the cyan lines stay, no black fills over S09
-    s.edgesB.u.uOn.value = eOn; s.edgesH.u.uOn.value = eOn;
-    s.edgesB.visible = s.edgesH.visible = edge;
-
-    if (kit.isOwner) {
-      kit.rigState.wire.on = 0; kit.rigState.wire.pulses = [];
-      const rays = Math.max(sm(62.6, 62.7, t) * (1 - sm(63.5, 64.0, t)), env(t, 64.94, 2.6), env(t, 67.36, 3.2));
-      kit.setSky({ rays: rays > 0.1 ? Math.min(1, rays * 1.2) : 0, rayR: 1.7, rot: t * 0.03, rings: 0, focal: [0, 0.3, -1] });
-    }
+    s.bolts.instanceMatrix.needsUpdate = true;
+    s.wheel.rotation.z = -Math.PI * 2 * sm(s.oh1, s.g2, t);
+    const gapK = sm(s.oh1 + 0.1, s.oh1 + 0.9, t);
+    s.gap.visible = gapK > 0.01 && t < s.g2 + 1.6;
+    s.gap.material.uniforms.uOpacity.value = gapK;
+    // the door swings open inward on its hinge (90 deg), gold light floods, then dies before the ring
+    const open = sm(s.g2, s.g2 + 1.6, t);
+    s.hinge.rotation.y = (Math.PI / 2) * open;
+    s.hinge.visible = t < 67.98;
+    // the light disc dies before it can reach the eyes (comfort: nothing within 1.5 m)
+    const lk = 1 - sm(67.0, 67.6, t);
+    s.light.visible = t > s.g2 - 0.1 && lk > 0.01;
+    s.ingots.visible = s.light.visible;
+    s.light.material.uniforms.uBright.value = (0.45 + 0.45 * open) * lk;
+    s.cones.visible = false;
+    { const dk = 1 - 0.75 * sm(s.g2 + 0.4, s.g2 + 1.4, t); for (const m of s.leafMats) m.uniforms.uBright.value = dk; } // the open leaf turns into a backlit silhouette
+    // fog as a curtain while the door stands open: the swung leaf and the far strongroom sink into black, the
+    // gold floor and the bars near the doorway stay (keeps the frame calm; S05 uses the same trick)
+    if (kit.isOwner) { const fk = sm(s.g2 + 0.6, s.g2 + 1.3, t); if (fk > 0) kit.setFog(PAL.black, 14 - 9.5 * fk, 50 - 38 * fk); }
+    kit.fade(1 - sm(67.55, 67.98, t));
   },
-
   events() {
     return [
-      { t: 57.0, sfx: 'tick', gain: 0.45 },
-      { t: 57.3, sfx: 'tick', gain: 0.45 },
-      { t: 57.5, sfx: 'tick', gain: 0.55 },
-      { t: 58.33, sfx: 'whoosh', gain: 0.4 },
-      { t: 59.96, sfx: 'shutter', gain: 0.7, haptic: [0.6, 90] },
-      { t: 64.0, sfx: 'ping', gain: 0.3 },
-      { t: 66.72, sfx: 'ping', gain: 0.3 },
+      { t: 56.52, sfx: 'tick', gain: 0.5 }, { t: 57.5, sfx: 'switch', gain: 0.5 },
+      { t: 58.6, sfx: 'whoosh', gain: 0.3 }, { t: 62.08, sfx: 'crack', gain: 0.6, haptic: [0.6, 70] },
+      { t: 64.0, sfx: 'pneumatic', gain: 0.5 }, { t: 64.94, sfx: 'lidOpen', gain: 0.6, haptic: [0.4, 120] },
+      { t: 66.3, sfx: 'whoosh', gain: 0.5 },
     ];
   },
 };

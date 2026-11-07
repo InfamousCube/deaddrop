@@ -14,7 +14,10 @@ You edit only your own `scenes-N.js`. The foundation files are `show.js`, `style
 | `type.js` | Glyph-atlas typography (`makeText`), the `words.json` index (`match` / `times` / `line`). |
 | `fx.js` | `particles`, `shards`, `matte` (portal), `edges` (edge-mode), and the helpers `sm`, `lightsOut`, `passBy`, `envAfter`, `fadeK`. |
 | `kit.js` | `saltFlat()` (S18; S01 now has its own 2 pairs of giant T-poles), `placeholder()`, `mergeSimple()`. |
-| `scenes-1.js` .. `scenes-4.js` | Default export: an array of scene objects (group 1 = S01-S05, 2 = S06-S09, 3 = S10-S13, 4 = S14-S18). |
+| `scenes-1.js` .. `scenes-4.js` | Default export: an array of scene objects (group 1 = S01-S05, 2 = S06-S09, 3 = S10-S13, 4 = S14-S18). Since round 3 they only import the scene files below. |
+| `scenes-1-s01.js` .. `scenes-3-s13.js`, `scenes-4-a/b/c.js` | One scene per file (group 4: S14+S15 in `a`, S16+S17 in `b`, S18 in `c`). The shot card in each file header is the source of truth. |
+| `scenes-1-util.js` .. `scenes-4-util.js`, `shapes-4.js` | Shared geometry builders per group (see **Shared builders** below). Read-only for other groups: import them, don't edit them. |
+| `STORYBOARD-v3.md` | Round 3 plan (Leo, 07.11.: "shapes too primitive", "too little happens around you", lyric timing). |
 
 Imports inside a scene file:
 
@@ -160,6 +163,22 @@ All in metres, world space = rig space.
 
 **Shared set piece.** `kit.saltFlat({ gap, spacing, count, height })` returns `{ group, update(t, d, bulbFn) }`: the black ground plus T-pole rows (2 draw calls + ground). `bulbFn(i, side, z)` returns a colour hex, or null for off.
 
+## Shared builders (round 3)
+
+Real objects from profiles (lathe, bevelled extrude, tube), one repeated fine motif per hero. Import from the util file; never fork it.
+
+- `scenes-1-util.js`
+  - geometry: `lathe(pts, seg)`, `ext(shape, depth, bevel)`, `tube(points, r)`, `roundRect`, `rrPath`, `archPts(w, h)`, `polyShape` / `polyPath`, `heartShape`, `ellPts`, `arcBand`, `gearShape(r, teeth, depth)`, `inst(geo, mat, n)`, `setM(mesh, i, x, y, z, ry, sc)`, `colorsOf`, `merge`.
+  - `buildTelegraphLine(kit, { gap, spacing, count, z0, height, wireR, sag, insR, rim, ramp })` returns `{ group, poles, ins, wires, wireAt(row, w, z, out), crossY, n, z0, spacing, gap }` (lathe poles, bevelled crossarms, instanced glass insulators, 4 sagging wires per row; S01).
+  - `buildQueenCard(kit, { rim })` returns `{ group, halo, haloMat, glassMat, glasses, smile, W: 7.2, H: 10 }` (angel side / spy side; S01).
+  - `buildCar(kit, { scale, ramp, rim, chrome })` returns `{ group, body, lampMat, tailMat, cones, wheels, len, wid }`: lofted 60s GT coupe, nose to +z, origin on the ground (S03).
+  - `buildChandelier(kit, { r, drops, ramp, dropColor })` (S02, S04).
+  - Shared glide path S03-S05: `PATH_KEYS`, `T_DOOR` (25.2), `streetY(t)`; the gold ball `ballOut(t, out)`, `BALL_R`.
+- `scenes-2-util.js`: `wt(kit, phrase, near, i)` (word time from `words.json`), `xf(geo, p, r, s)`, `merge`, `paint(geo, hex)`, `lathe`, `ext`, `tube`, `cyl`, `shapeOf`, `circlePath`, `ringShape(r0, r1)`, `roundRect`, `archPts`, `gearGeo({ r, teeth, spokes, rim, hub, bolts, saw })` (real toothed gear with spoke windows and bolts), `angelParts()` (foundry statue), `ladyParts()` (the dancer: gown, bob, gloves, glasses).
+- `scenes-3-util.js`: `setI`, `inst`, `instColors`, `setC`, `facet`, `merge`, `lathe`, `ribbed(geo, n, amt)`, `circ`, `rrect`, `shapeOf(pts, holes)`, `extrude`, `tube`, `sagPts(a, b, sag)`, `bbox`, `box`, `beam(a, b, w)`, `wireMat(kit, color)` (a wire that lights along its length, `uK1`), `HARBOUR` (S11-S13 path, bridge and pier), `HOT_NIGHT` (S12/S13 sky preset).
+- `scenes-4-util.js`: `inst`, `setM`, `setMQ`, `initColors`, `setC`, `mixC`, `boxAt`, `shapeGeo`, `mirrorOutline`, `crescent`, `profile`, `clipBand`, `sung(kit, phrase, near)` (word times; its `FIX` table for the bridge is inert since `words.json` carries the corrected times).
+- `shapes-4.js`: `extrude`, `lathe`, `tube`, `catenary`, `chaikin`, `reelFlange` / `reelHub` (S14 tape machine), `monitorGeos()` and the `pic*()` screen pictures (S15), `poleGeo()` / `insulatorGeo()` / `POLE` (S18 telegraph line), `flameGeo`, `cloudGeo`.
+
 ## Sound effects (`events()`)
 
 The available sfx names are:
@@ -200,7 +219,13 @@ python tools/clarity.py --quiet tools/shots/blackbox/clean/full/frames --json to
 
 - `fov=95` is the **vertical** field of view (about 125 deg horizontal at 16:9), and the forward view is pitched -7 deg, so a still spans roughly -54 to +40 deg elevation. Heroes and text look smaller there than on the Quest.
 - Black beats: only two designed ones (S06 "hold your breath" 42.76-47.5 and S15 "lights out" 124.9-127.6), and both keep a faint ground (S06 petrol floor, S15 funnel rim). Every other shot has a field colour behind its hero.
-- Last full check (07.11., after the review fixes, 51 forward frames every 3 s from 0.8 s): median edges 0.035, busy 3.6, black 0.52; 0 frames over a per-frame limit. Sheets in `tools/shots/blackbox/clean/final/` (360 views: `clean/full360/`).
+- Round 2 check (07.11., 51 forward frames every 3 s from 0.8 s): median edges 0.035, busy 3.6, black 0.52; 0 frames over a per-frame limit. Sheets in `tools/shots/blackbox/clean/final/`.
+- **Round 3 check** (07.11., integration, same grid): median edges 0.056, busy 6.7, black 0.55; 0 of 51 frames over a per-frame limit; peak 56 draw calls / 57k triangles per eye. Sheets in `tools/shots/blackbox/v3/full/` (360 views at 10 times: `v3/full360/`, seams at t-0.3 / t / t+0.4: `v3/seams/`). Round 3 has richer heroes and side rows, so the edge median sits at the limit: new detail must replace, not add.
+- **Round 4 fixes** (07.11., review of round 3): S06 gears in 3 depths with solid fills lit from the aisle (brass near 4.2 m, steel 6.6 m, 5 brass gears in the shaft wall that rise past while you sink; none cut the floor any more) and a round floor indicator (cream face, B/5/10, crimson hand, brass pivot) at az 46; S04 tower sinks whole instead of bursting into specks; S08 open door shows a gold strongroom floor with gold bars (no flat gold disc), the opened leaf dims to a backlit silhouette; S09 safe has a big dial in a bolt ring, a 1.4x handwheel and barrel hinges, laser X's on both vault-room walls (5.4 m out), a pedestal with a cut diamond under a cyan spot and 3 security cameras at the corridor end; S11 cyan light shafts from the surface beside the path; S12 four moored boat silhouettes at 7.5 m on both sides; S14 cream NAB reels, dark smoke wipe; S15 lit monitor cases. Check (same grid): median edges 0.056, busy 7.4, black 0.56, 0 of 51 over; peak 56 calls / 57k tris. Sheets `v3/final/`. The edge median is at the limit again: replace, don't add.
+- Two tricks that keep a transition frame calm:
+  - **Fog as a curtain.** Pull the owner's fog in while a dense far row is on screen (`kit.setFog` every frame, pure in t). S05 pulls black fog from 7-24 m to 5-13 m while the mirrors stand open (30.4-35.6).
+  - **Murk instead of a long dim fade.** A world faded to 10-40 % breaks into specks (only its bright edges survive). Fade up in 0.1 s into thick fog of the field colour, then open the fog (S11: petrol fog 2.5 m to 42 m over 84.7-85.5).
+- A block should leave (`out`) about 0.2 s before the next block in the same place slides in, or both are on screen during the 0.25 s slide (S05).
 
 ## Testing (silent, headless; never open windows or play sound)
 
@@ -210,6 +235,9 @@ node tools/xrtest.mjs        # must end ALL PASS
 ```
 
 - `tape=2` is DD-003 (the index is 0-based).
+- **Lyric timing:** `node tools/lyriccheck.mjs port=5826 [from=0 to=151.8]` boots the show, samples every text block every 0.01 s and compares each word's first visible frame with its `words.json` onset. It must print `0 mismatches` (tolerance 0.08 s; EARLY/LATE, COUNTER for digits, EXTRA, MISSING, NEVER). Part B (advisory) checks `words.json` itself against the vocal stem `analysis/gold-on-the-wire/vocals.wav` when it exists; `runs=a-b` lists voiced runs to re-time words.
+- **`words.json` corrections** (07.11., STORYBOARD-v3 section 2, applied in the file): Gold 13.42, car 17.87, mirror 29.39, tick 38.52, here 45.14, Gold/on/the/wire/tonight 60.52/61.15/61.43/61.72/62.28, Oh-oh 66.13 (its squeezed "gold on the wire" 67.36-67.54 removed), Waltzing 72.03, Tick 86.82 (uncertain), both bridge countdowns 114.29/115.39/116.56 and 119.95/121.16/122.27, never/here 118.33/118.91, You/were/never/here 123.15/123.50/123.85/124.35, Lights 125.70, Gold 128.27; L38's squeezed duplicate "gold on the wire" (147.34-147.52) removed, "tonight" 148.00 kept. Every block reads its times through `near:` / `wt()` / `sung()`, so a later correction in `words.json` carries over by itself. No other show reads `words.json`. The file before these corrections is kept in `analysis/gold-on-the-wire/words.before-v3.json`.
+- **Nothing travels with the player:** no mesh may follow the player. S06's floor dial is mounted on the shaft wall (world-fixed); you sink past it while its needle sweeps 10 to B.
 - Use a different `port` per parallel render (group 1: 5811, 2: 5812, 3: 5813, 4: 5814, integration 5825-5828). `node tools/xrtest.mjs` uses a fixed port: run one instance at a time.
 - `frames=1` also writes every still as a PNG to `<out>/frames/` for `clarity.py`.
 - The sheet prints draw calls and triangles per still (one eye, 1280x720).

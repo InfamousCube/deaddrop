@@ -83,3 +83,34 @@ export function clipBand(geo, b0, b1, slant) {
   P.needsUpdate = true; UV.needsUpdate = true;
   geo.computeBoundingSphere();
 }
+
+// ---------------------------------------------------------------------------------------------
+// Sung word times for group 4 blocks. STORYBOARD-v3 section 2 corrects 13 word times of the bridge
+// (both 3-2-1 countdowns, "never here", "Lights"). The fix belongs in words.json (integrator); until
+// it lands there, a time that still equals the old words.json value is mapped to the corrected one,
+// so the show is right with either file. Once words.json carries the new times this table is inert.
+const FIX = new Map([
+  [112.62, 114.29], [114.6, 115.39], [115.9, 116.56],                     // L28 three two one
+  [118.02, 118.33], [118.54, 118.91],                                     // L29 never here
+  [118.68, 119.95], [119.2, 121.16], [119.5, 122.27],                     // L30 three two one
+  [119.56, 123.15], [122.3, 123.5], [122.6, 123.85], [123.0, 124.35],     // L31 you were never here
+  [124.94, 125.7],                                                        // L32 Lights
+]);
+const fixT = (s) => { for (const [o, n] of FIX) if (Math.abs(s - o) < 0.005) return n; return s; };
+const normW = (w) => String(w).toLowerCase().replace(/[^a-z0-9']/g, '').replace(/'/g, '');
+// start times of the sung phrase (consecutive words) whose corrected first word is nearest `near`
+export function sung(kit, phrase, near) {
+  const want = phrase.split(/\s+/).map(normW);
+  const flat = [];
+  for (const l of kit.words.lines) for (const [w, s] of l.w) flat.push([normW(w), s]);
+  let best = null, bd = Infinity;
+  for (let i = 0; i + want.length <= flat.length; i++) {
+    let ok = true;
+    for (let j = 0; j < want.length && ok; j++) ok = flat[i + j][0] === want[j];
+    if (!ok) continue;
+    const ts = want.map((_, j) => fixT(flat[i + j][1]));
+    const dd = Math.abs(ts[0] - near);
+    if (dd < bd) { bd = dd; best = ts; }
+  }
+  return best || want.map((_, j) => near + j * 0.3);
+}

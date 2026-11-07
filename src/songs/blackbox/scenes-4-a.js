@@ -1,331 +1,444 @@
-// Group 4, part A: S14 the records archive and shredder (bridge "three, two, one, you were never here")
-// and S15 inside the scope (the record is wiped, then the old screen switches off into a dot).
-// Clean-pass rules (IEYTD): one hero per shot, black + one field colour + one accent, big shapes,
-// one main motion at a time, one lyric block at a time in calm space.
+// Group 4, part A (round 3, STORYBOARD-v3): S14 the tape destroys itself, S15 the cameras go dark.
+// Shapes come from shapes-4.js (bevelled extrusions, lathes, NAB reels, CRT monitors). Word times come
+// from words.json through sung() (scenes-4-util.js), which applies the storyboard's bridge corrections.
 import * as THREE from 'three';
 import { PAL } from './style.js';
-import { mergeSimple } from './kit.js';
-import { D2R, EYE, f, inst, setM, initColors, setC, mixC, boxAt, shapeGeo, mirrorOutline, clipBand, lin, envAt } from './scenes-4-util.js';
+import { D2R, EYE, inst, setM, setMQ, initColors, setC, mixC, lin, envAt, clamp01, sung } from './scenes-4-util.js';
+import {
+  xf, merge, extrude, lathe, tube, roundRect, roundRectHole, reelFlange, reelHub, monitorGeos, MON,
+  picVault, picChess, picBooth, picCorridor, picRoom, herFront, herProfile, flameGeo, cloudGeo,
+} from './shapes-4.js';
+
+const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3();
+const C_WHITE = new THREE.Color(PAL.white), C_AMBER = new THREE.Color(PAL.amber);
 
 // =================================================================================================
-// S14 The records archive and shredder (112.04 to 119.98, cold)
-// SHOT: hero = the shredder, a black machine with two cyan eyes at the end of the aisle, a cream
-// dossier (her black bust) hanging over its mouth. Supports: two walls of big petrol drawers, two
-// lampshades with teal pools. Motion: one bank of drawers slams + one light per number; the machine
-// wakes on "one" and eats the dossier. Lyric: one numeral at a time, low centre over the dark floor.
-const LAMPZ = [-2, -9];                    // lamp "3" (near), lamp "2" (mid); "1" is the machine itself
-const LON = [112.62, 114.6], LOFF = [119.5, 119.2];
-const EYES_ON = 115.9, EYES_OFF = 118.68, RUN = 116.59;
-const FLOOR = -0.5;
-const UNITZ = [15, 10, 5, 0, -5, -10, -15];
-const SHZ = -24.5, SHH = 9;                 // shredder centre z (front face at -22), height
-const CABX = 5.2, FACEX = 4.4;
-const ROWY = [FLOOR + 1.25, FLOOR + 3.5, FLOOR + 5.75];
-const NSTRIP = 6;
+// S14 The tape destroys itself (112.04 to 119.70, cold)
+// SHOT: hero = a giant reel-to-reel tape machine whose front folds around you: the centre panel ahead
+// (head block with the tape running across it, two VU meters, three warning lamps, piano-key
+// transport), the two 6 m reels on wings at your left and right (about 50 deg out, turning 3 deg/s).
+// Palette: black, petrol steel, cyan bevels, cream meters, rust lamps and flames, brass tape.
+// Motion: the lamps go out on "three, two, one", smoke puffs from the head; on "you" the tape catches
+// fire at the head and the flames race both ways to the reels; "never" it snaps and falls; "here" the
+// reels break loose and drift away. Out: SMOKE WIPE (petrol puffs close from both sides, part on S15).
+// Lyric: one block at a time, low centre (d 5) over the transport keys.
+const PZ = -6.5;                       // centre panel front face
+const PW = 7.2, PH = 10.2, PY0 = -2.6, PYC = PY0 + PH / 2;
+const WW = 7.4, WANG = 45 * D2R;       // wing panels, folded 45 deg toward you
+const RR = 3.1;                        // reel radius (real 26.5 cm reel at x23)
+const PACK = [0.8, 0.42];              // feed / take-up pack radius (x RR)
+const TAPE_Y = 4.3, ROLL_X = 3.0, ROLL_R = 0.42, TZ = PZ + 0.62, REEL_Y = 3.4;
+const LAMP_X = [0, 0, 0], LAMP_YS = [3.05, 2.2, 1.35]; // lamp "3" (top), "2", "1": a column between the meters
+const MX = 2.1, MY = 2.2;              // VU meters
+const VB = 11;                         // burn speed along the tape (m/s)
+const SMOKE_IN = [118.95, 119.4], SMOKE_OUT = [119.48, 119.93]; // closed 119.36-119.5: the worlds swap behind it
+
+function wingMatrix(side) {
+  const hx = side * (PW / 2 + 0.05);
+  const c = new THREE.Vector3(hx + side * Math.cos(WANG) * (WW / 2), PYC, PZ + Math.sin(WANG) * (WW / 2));
+  return new THREE.Matrix4().compose(c, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -side * WANG, 0)), new THREE.Vector3(1, 1, 1));
+}
 
 export const S14 = {
-  id: 'S14', t0: 112.04, t1: 119.98, world: 'cold', pre: 0, post: 0,
-  key: [0.12, 0.95, -0.28],
-  fog: { color: 0x000000, near: 16, far: 75 },
+  id: 'S14', t0: 112.04, t1: 119.70, world: 'cold', pre: 0, post: 0.25,
+  key: [0.3, 0.9, 0.3],
+  fog: { color: 0x000000, near: 14, far: 60 },
   sky: { stars: 0, hor: PAL.black, hor2: PAL.black, zen: PAL.black, nadir: PAL.black, rays: 0, rings: 0 },
   build(kit) {
-    const s = { settled: false };
+    const s = { mats: [] };
+    [s.t3, s.t2, s.t1] = sung(kit, 'three two one', 114.29);
+    [s.tYou, s.tWere, s.tNever, s.tHere] = sung(kit, 'you were never here', 117.74);
     const W = (s.world = new THREE.Group());
     kit.group.add(W);
-    const R = kit.rnd(1401);
-    s.prof = kit.travel([[112.04, 1.2, 0.01]]);
+    const M = (s.machine = new THREE.Group());
+    W.add(M);
+    s.prof = kit.travel([[112.04, 0.25, 0.01]]);
+    const tn = (o) => { const m = kit.toon(o); s.mats.push(m); return m; };
+    const fl = (o) => { const m = kit.flat(o); s.mats.push(m); return m; };
+    const R = kit.rnd(1407);
 
-    W.add(new THREE.Mesh(new THREE.PlaneGeometry(30, 120).rotateX(-Math.PI / 2).translate(0, FLOOR, -30), kit.flat({ color: PAL.black, fog: 0 })));
-    // pools of lamp light on the floor (one big teal ellipse per lamp)
-    s.pools = initColors(inst(new THREE.CircleGeometry(3.4, 28).rotateX(-Math.PI / 2), kit.flat({ color: PAL.white, fog: 0.5 }), 2, 's14-pools'), 2, PAL.teal);
-    W.add(s.pools);
+    M.add(new THREE.Mesh(new THREE.PlaneGeometry(70, 70).rotateX(-Math.PI / 2).translate(0, PY0, -4), kit.flat({ color: PAL.black, fog: 0 })));
 
-    // cabinet carcasses: 9 tall units per side
-    s.cabMat = kit.toon({ ramp: [PAL.black, PAL.black, PAL.petrolDeep], rim: null });
-    const cab = inst(new THREE.BoxGeometry(1.6, 7, 4.6).translate(0, 3.5, 0), s.cabMat, UNITZ.length * 2, 's14-cabinets');
-    UNITZ.forEach((uz, i) => { for (let sd = 0; sd < 2; sd++) setM(cab, i * 2 + sd, (sd ? 1 : -1) * CABX, FLOOR, uz); });
-    W.add(cab);
-    // drawers: 3 big ones per unit, open by different amounts, slammed shut one bank per number
-    const ND = UNITZ.length * 2 * 3;
-    s.ND = ND;
-    s.dz = new Float32Array(ND); s.dx = new Float32Array(ND); s.dy = new Float32Array(ND); s.dOpen = new Float32Array(ND); s.dSlam = new Float32Array(ND);
-    let k = 0;
-    for (const uz of UNITZ) for (let sd = 0; sd < 2; sd++) for (let r = 0; r < 3; r++) {
-      s.dz[k] = uz; s.dx[k] = sd ? 1 : -1; s.dy[k] = ROWY[r]; s.dOpen[k] = 0.35 + R() * 1.05;
-      s.dSlam[k] = (uz >= -3 ? 112.62 : uz >= -12 ? 114.6 : EYES_ON) + R() * 0.05;
-      k++;
+    // ---- the faceplate: centre panel + two folded wings, corner screws ----
+    const WM = [wingMatrix(-1), wingMatrix(1)];
+    const screw = merge([lathe([[0.2, 0], [0.2, 0.04], [0.15, 0.09], [0, 0.11]], 10, 'z'), xf(new THREE.BoxGeometry(0.28, 0.05, 0.04), 0, 0, 0.1)]);
+    const screwsAt = (w, h, mtx) => [-1, 1].flatMap((sx) => [-1, 1].map((sy) => xf(screw.clone(), sx * (w / 2 - 0.45), sy * (h / 2 - 0.45), 0.02).applyMatrix4(mtx)));
+    const cM = new THREE.Matrix4().makeTranslation(0, PYC, PZ);
+    const pan = [extrude(roundRect(PW, PH, 0.6), 0.3, 0.12, 6).applyMatrix4(cM), ...WM.map((m) => extrude(roundRect(WW, PH, 0.6), 0.3, 0.12, 6).applyMatrix4(m))];
+    const panMat = tn({ ramp: [PAL.black, 0x03141a, PAL.petrolDeep], rim: PAL.cyan, rimAmt: 0.35, th: [-0.15, 0.7] });
+    M.add(new THREE.Mesh(merge(pan), panMat));
+    M.add(new THREE.Mesh(merge([...screwsAt(WW, PH, WM[0]), ...screwsAt(WW, PH, WM[1])]), tn({ ramp: 'steel', rim: null })));
+
+    // ---- the reels: two flanges with three windows, the wound tape pack, the hub with key slots ----
+    const flg = reelFlange(RR);
+    const flanges = merge([flg.clone().translate(0, 0, 0.38), flg.clone().translate(0, 0, -0.2)]);
+    const hubG = reelHub(RR, 0.72).translate(0, 0, 0.46);
+    const spindle = lathe([[0.3, -0.85], [0.3, -0.36], [0, -0.36]], 12, 'z');
+    const flMat = tn({ ramp: [PAL.petrol, PAL.creamDark, PAL.cream], rim: PAL.cyan, rimAmt: 0.45, th: [-0.1, 0.55] }); // Round 4: aluminium-cream NAB reels read at a glance (petrol ones were blobs)
+    const packMat = tn({ ramp: [PAL.black, PAL.brassDark, PAL.brass], rim: null });
+    const hubMat = tn({ ramp: 'steel', rim: PAL.cyan, rimAmt: 0.5 });
+    s.reels = [];
+    for (let k = 0; k < 2; k++) {
+      const side = k ? 1 : -1;
+      const g = new THREE.Group();
+      new THREE.Matrix4().multiplyMatrices(WM[k], new THREE.Matrix4().makeTranslation(-side * 0.8, REEL_Y - PYC, 0.8)).decompose(g.position, g.quaternion, g.scale);
+      M.add(g);
+      g.add(new THREE.Mesh(spindle, hubMat));
+      const spin = new THREE.Group();
+      g.add(spin);
+      spin.add(new THREE.Mesh(flanges, flMat));
+      spin.add(new THREE.Mesh(new THREE.CylinderGeometry(PACK[k] * RR, PACK[k] * RR, 0.4, 48).rotateX(Math.PI / 2), packMat));
+      spin.add(new THREE.Mesh(hubG, hubMat));
+      const n = new THREE.Vector3(0, 0, 1).applyQuaternion(g.quaternion);
+      s.reels.push({ g, spin, base: g.position.clone(), out: new THREE.Vector3(-n.x + side * 0.35, 0.05, -n.z).normalize(), top: g.position.clone().add(new THREE.Vector3(0, PACK[k] * RR, 0)) });
     }
-    s.front = initColors(inst(new THREE.BoxGeometry(0.1, 1.9, 4.2), kit.flat({ color: PAL.white, fog: 1 }), ND, 's14-fronts'), ND, PAL.petrol);
-    s.body = inst(new THREE.BoxGeometry(1.0, 1.85, 4.1), kit.toon({ ramp: [PAL.black, PAL.black, PAL.petrolDeep], rim: null }), ND, 's14-drawers');
-    W.add(s.front, s.body);
 
-    // THE SHREDDER: a black machine across the aisle end, mouth slot on top, two round eyes
-    W.add(new THREE.Mesh(boxAt(12, SHH, 5, 0, FLOOR + SHH / 2, SHZ), kit.toon({ ramp: [PAL.black, PAL.petrolDeep, PAL.petrol], rim: PAL.cyan, rimAmt: 0.8 })));
-    s.eyes = initColors(inst(new THREE.CircleGeometry(1.05, 24), kit.flat({ color: PAL.white, fog: 0.2 }), 3, 's14-eyes'), 3, PAL.petrolDeep);
-    setM(s.eyes, 0, -3.6, FLOOR + 4.2, SHZ + 2.55); setM(s.eyes, 1, 3.6, FLOOR + 4.2, SHZ + 2.55);
-    setM(s.eyes, 2, 0, FLOOR + SHH - 1.1, SHZ + 2.55, 4.6, 0.3, 1); // the mouth slot (a squashed disc = rounded band)
-    W.add(s.eyes);
+    // ---- head block, rollers, capstan, meter bezels, lamp bezels (one steel mesh) ----
+    const roller = lathe([[0.42, 0], [0.42, 0.06], [0.35, 0.09], [0.35, 0.31], [0.42, 0.34], [0.42, 0.4], [0.12, 0.43], [0, 0.43]], 16, 'z');
+    const bez = roundRect(2.3, 1.75, 0.26); bez.holes.push(roundRectHole(1.98, 1.42, 0.17));
+    const lampBez = lathe([[0.42, 0], [0.42, 0.08], [0.36, 0.17], [0.3, 0.17], [0.29, 0.05]], 14, 'z');
+    const steel = [
+      xf(extrude(roundRect(4.6, 2.3, 0.35), 0.12, 0.05, 5), 0, TAPE_Y + 0.25, PZ + 0.22),        // mounting plate
+      xf(extrude(roundRect(2.7, 1.5, 0.32), 0.36, 0.07, 5), 0, TAPE_Y + 0.38, PZ + 0.52),        // head cover
+      xf(extrude(roundRect(0.5, 0.22, 0.06), 0.36, 0.04, 3), -0.62, TAPE_Y - 0.22, PZ + 0.6),    // head shields
+      xf(extrude(roundRect(0.5, 0.22, 0.06), 0.36, 0.04, 3), 0.62, TAPE_Y - 0.22, PZ + 0.6),
+      xf(roller.clone(), -ROLL_X, TAPE_Y - ROLL_R, PZ + 0.4), xf(roller.clone(), ROLL_X, TAPE_Y - ROLL_R, PZ + 0.4),
+      xf(lathe([[0.09, -0.6], [0.09, 0.45], [0.14, 0.5], [0, 0.56]], 10), 1.85, TAPE_Y, PZ + 0.5),  // capstan
+      xf(new THREE.BoxGeometry(0.2, 0.2, 0.75), 1.85, TAPE_Y + 0.42, PZ + 0.72),               // pinch-roller arm
+      xf(extrude(bez, 0.18, 0.06, 5), -MX, MY, PZ + 0.3), xf(extrude(bez, 0.18, 0.06, 5), MX, MY, PZ + 0.3),
+      ...LAMP_X.map((x, i) => xf(lampBez.clone(), x, LAMP_YS[i], PZ)),
+    ];
+    M.add(new THREE.Mesh(merge(steel), tn({ ramp: 'cold', rim: PAL.cyan, rimAmt: 0.6, th: [-0.1, 0.5] })));
+    M.add(new THREE.Mesh(xf(lathe([[0, -0.33], [0.3, -0.33], [0.35, -0.28], [0.35, 0.28], [0.3, 0.33], [0, 0.33]], 14), 1.85, TAPE_Y, PZ + 1.08), tn({ ramp: [PAL.black, PAL.black, PAL.velvet], rim: PAL.cyan, rimAmt: 0.8 })));
 
-    // two huge lampshades (no cords), bulbs light up one per number
-    const shades = inst(new THREE.ConeGeometry(1.8, 1.6, 16, 1, true), kit.toon({ ramp: 'black', rim: PAL.cyan, side: THREE.DoubleSide }), 2, 's14-shades');
-    W.add(shades);
-    s.bulbs = initColors(inst(new THREE.SphereGeometry(0.55, 12, 6), kit.flat({ color: PAL.white, fog: 0.3 }), 2, 's14-bulbs'), 2, 0x0a0a0a);
-    for (let j = 0; j < 2; j++) { setM(shades, j, 0, 11, LAMPZ[j]); setM(s.bulbs, j, 0, 10.4, LAMPZ[j]); }
-    W.add(s.bulbs);
-
-    // the Engineer's dossier: one cream sheet, her black bust, one redaction bar, a thick gold cable
-    const dos = (s.dos = new THREE.Group());
-    dos.position.set(0, FLOOR + SHH + 0.9, SHZ);
-    W.add(dos);
-    s.paperMat = kit.flat({ color: PAL.cream, fog: 0.3, side: THREE.DoubleSide });
-    dos.add(new THREE.Mesh(new THREE.PlaneGeometry(7, 9.5).translate(0, 4.75, 0), s.paperMat));
-    const sil = mirrorOutline([[-1.5, 0], [-1.45, 0.55], [-1.1, 0.85], [-0.55, 1.0], [-0.42, 1.38], [-0.26, 1.32], [-0.22, 1.5], [-0.56, 1.5], [-0.62, 1.95], [-0.5, 2.45], [-0.25, 2.66], [0, 2.7]]);
-    const silG = shapeGeo(sil, 1.85); silG.translate(0, 3.6, 0.03);
-    dos.add(new THREE.Mesh(mergeSimple([silG.toNonIndexed(), boxAt(5.2, 0.8, 0.01, 0, 1.9, 0.03).toNonIndexed()]), kit.flat({ color: PAL.black, fog: 0.3 })));
-    dos.add(new THREE.Mesh(boxAt(0.3, 30, 0.3, 0, 9.5 + 15, 0), kit.flat({ color: PAL.gold, fog: 0.3 })));
-
-    // ---- lyric type: one numeral at a time, low centre (calm floor) ----
-    const num = (ch, a, b, color, cap, at) => kit.text(ch, { cap, color, times: [a], pop: true, dur: 0.1, out: b, outDur: 0.08, depthTest: false, at }); // never cut by the floor
-    const LOW = { d: 5, az: 0, y: 0.0 };
-    num('3', 112.62, 114.48, 'gold', 1.8, LOW); num('2', 114.6, 115.8, 'gold', 1.8, LOW); num('1', 115.9, 117.55, 'gold', 1.8, LOW);
-    s.ywnh = kit.text('YOU WERE NEVER HERE', { cap: 0.72, color: 'cream', near: 117.74, out: 118.54, outDur: 0.02, depthTest: false, at: { d: 5, az: 0, y: 0.1 } });
-    // "here": the line is cut into strips that drop away like shredded paper (the scene's one accent)
-    const wy0 = s.ywnh.words[0].y0 - 0.1, wy1 = s.ywnh.words[0].y1 + 0.1;
-    s.strips = [];
-    for (let i = 0; i < NSTRIP; i++) {
-      const T = kit.text('YOU WERE NEVER HERE', { cap: 0.72, color: 'cream', times: 118.54, dur: 0.001, out: 118.98, outDur: 0.08, depthTest: false, at: { d: 5, az: 0, y: 0.1 } });
-      clipBand(T.mesh.geometry, wy0 + ((wy1 - wy0) * i) / NSTRIP, wy0 + ((wy1 - wy0) * (i + 1)) / NSTRIP, 0.2);
-      s.strips.push({ T, y: T.mesh.position.y, delay: (NSTRIP - 1 - i) * 0.03, dx: (R() - 0.5) * 1.2, rz: (R() - 0.5) * 0.6 });
+    // ---- VU meters: cream faces, chunky scale marks, red zone, black needles ----
+    const face = new THREE.ShapeGeometry(roundRect(1.98, 1.42, 0.17), 5);
+    M.add(new THREE.Mesh(merge([-MX, MX].map((x) => face.clone().translate(x, MY, PZ + 0.03))), fl({ color: PAL.cream, fog: 0.4 })));
+    const marks = [], zones = [];
+    for (const x of [-MX, MX]) {
+      const px = x, py = MY - 0.6;
+      for (let k = 0; k < 7; k++) {
+        const a = (-50 + (k * 100) / 6) * D2R;
+        marks.push(xf(new THREE.PlaneGeometry(0.075, k === 4 ? 0.26 : 0.18), px + Math.sin(a) * 1.0, py + Math.cos(a) * 1.0, PZ + 0.045, 0, 0, -a));
+      }
+      marks.push(xf(new THREE.CircleGeometry(0.11, 14), px, py + 0.02, PZ + 0.05));
+      zones.push(xf(new THREE.RingGeometry(0.9, 1.0, 10, 1, 40 * D2R, 32 * D2R), px, py, PZ + 0.04));
     }
-    // the machine counts down again between its eyes as the lights go out
-    const MID = { d: 6, az: 0, y: 1.75 };
-    num('3', 118.68, 119.12, 'cream', 1.25, MID); num('2', 119.2, 119.44, 'cream', 1.25, MID); num('1', 119.5, 119.82, 'cream', 1.25, MID);
+    M.add(new THREE.Mesh(merge(marks), fl({ color: PAL.black, fog: 0.4 })));
+    M.add(new THREE.Mesh(merge(zones), fl({ color: PAL.crimson, fog: 0.4 })));
+    s.needles = inst(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(-0.04, -0.05), new THREE.Vector2(0.04, -0.05), new THREE.Vector2(0.012, 1.08), new THREE.Vector2(-0.012, 1.08)])), kit.flat({ color: PAL.black, fog: 0.4 }), 2, 's14-needles');
+    M.add(s.needles);
+
+    // ---- three warning lamps (faceted rust jewels with an orange halo) ----
+    s.jewels = initColors(inst(lathe([[0.29, 0], [0.29, 0.07], [0.24, 0.2], [0.14, 0.3], [0, 0.33]], 8, 'z'), tn({ ramp: [PAL.rust, PAL.orange, PAL.amber], rim: null, th: [-0.3, 0.4] }), 3, 's14-jewels'), 3);
+    s.halos = inst(new THREE.CircleGeometry(0.5, 20), kit.flat({ color: PAL.orange, fog: 0.4 }), 3, 's14-halos');
+    LAMP_X.forEach((x, i) => setM(s.jewels, i, x, LAMP_YS[i], PZ + 0.07));
+    M.add(s.jewels, s.halos);
+
+    // ---- piano-key transport (rewind, play, ffwd, stop, record) ----
+    const keys = initColors(inst(extrude(roundRect(1.0, 0.62, 0.13), 0.42, 0.06, 4), tn({ ramp: 'cream', rim: PAL.cyan, rimAmt: 0.4 }), 5, 's14-keys'), 5);
+    for (let i = 0; i < 5; i++) { setM(keys, i, -2.44 + i * 1.22, PY0 + 0.75, PZ + 0.5 + (i === 1 ? -0.12 : 0)); if (i === 4) setC(keys, i, 0xff5a40, 0.75); }
+    M.add(keys);
+
+    // ---- the tape: brass ribbon pack -> roller -> across the head -> roller -> take-up pack ----
+    const path = [s.reels[0].top, new THREE.Vector3(-ROLL_X, TAPE_Y, TZ), new THREE.Vector3(ROLL_X, TAPE_Y, TZ), s.reels[1].top];
+    s.seg = [];
+    let arc = 0;
+    const segs = [];
+    for (let k = 0; k < 3; k++) {
+      const a = path[k], b = path[k + 1], L = a.distanceTo(b), n = Math.max(2, Math.round(L / 0.25));
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), _v.subVectors(b, a).normalize());
+      for (let i = 0; i < n; i++) segs.push({ p: a.clone().lerp(b, (i + 0.5) / n), q: q.clone(), len: (L / n) * 1.04, s: arc + ((i + 0.5) * L) / n });
+      arc += L;
+    }
+    const sHead = path[0].distanceTo(path[1]) + ROLL_X;
+    for (const g of segs) { g.dist = Math.abs(g.s - sHead); g.delay = R() * 0.08; g.spin = (R() - 0.5) * 3; }
+    s.seg = segs;
+    s.tape = initColors(inst(new THREE.BoxGeometry(1, 0.34, 0.1), kit.flat({ color: PAL.white, fog: 0.3 }), segs.length, 's14-tape'), segs.length, PAL.brass);
+    M.add(s.tape);
+    // flat cel flames riding the tape (outer orange, inner amber), every other segment
+    s.NF = Math.ceil(segs.length / 2);
+    s.flA = inst(flameGeo(0.75, 1.3), kit.flat({ color: PAL.orange, fog: 0.3, side: THREE.DoubleSide }), s.NF, 's14-flames');
+    s.flB = inst(flameGeo(0.42, 0.7), kit.flat({ color: PAL.amber, fog: 0.3, side: THREE.DoubleSide }), s.NF, 's14-flames-core');
+    M.add(s.flA, s.flB);
+
+    // ---- behind you: dark racks of other machines (big silhouettes, each with two small reels) ----
+    const rk = [], minis = [];
+    const mini = reelFlange(0.95);
+    for (const x of [-5.4, 0, 5.4]) {
+      rk.push(xf(extrude(roundRect(3.7, 9.4, 0.35), 1.0, 0.1, 5), x, PY0 + 4.7, 7.6, 0, Math.PI, 0));
+      for (const dx of [-0.95, 0.95]) minis.push(xf(mini.clone(), x + dx, PY0 + 6.9, 7.35, 0, Math.PI, 0));
+    }
+    M.add(new THREE.Mesh(merge(rk), tn({ ramp: [PAL.black, PAL.black, PAL.petrolDeep], rim: PAL.teal, rimAmt: 0.7 })));
+    M.add(new THREE.Mesh(merge(minis), tn({ ramp: [PAL.petrolDeep, PAL.petrol, PAL.teal], rim: PAL.cyan, rimAmt: 0.5, key: [0.2, 0.6, -0.77] })));
+
+    // ---- smoke from the head on "three" and "two" (the scene's one particle accent) ----
+    W.add(kit.particles({
+      n: 12, shape: 'disc', billboard: true, seed: 1414, init: (i, r) => {
+        const big = i >= 4, t0 = (big ? s.t2 : s.t3) + r() * 0.12;
+        return { p: [(r() - 0.5) * 1.2, TAPE_Y + 1.0, PZ + 0.8], v: [(r() - 0.5) * 1.6, 0.9 + r() * 0.8, 0.3 + r() * 0.4], g: [0, 0.25, 0], t0, life: 1.5, s: (big ? 1.1 : 0.7) + r() * 0.5, c: r() < 0.5 ? PAL.teal : PAL.petrol };
+      },
+    }));
+
+    // ---- SMOKE WIPE: two flat petrol clouds roll in from the sides (3.4 m out) and part on S15 ----
+    const back = [[0, 0, 3.3], [0, 3.4, 3.0], [0, -3.4, 3.0], [-1.9, 1.8, 2.4], [1.9, 1.6, 2.3], [-1.6, -2.3, 2.4], [1.8, -2.6, 2.2], [0.6, 5.6, 2.0], [-0.8, -5.4, 2.2], [2.9, 0.2, 1.9], [-2.9, -0.2, 1.9]];
+    const front = [[0.7, 1.2, 1.6], [-1.0, -0.9, 1.7], [1.6, -1.7, 1.4], [-0.5, 3.2, 1.4], [0.9, -3.7, 1.3], [2.3, 2.5, 1.2], [-2.2, 1.1, 1.2]];
+    const cb = cloudGeo(back), cf = cloudGeo(front).translate(0, 0, 0.06);
+    const smBack = kit.flat({ color: PAL.black, fog: 0 }), smFront = kit.flat({ color: 0x03141a, fog: 0 }); // Round 4: dark smoke (teal puffs read as smudges)
+    s.clouds = [-1, 1].map((sd) => {
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(cb, smBack), new THREE.Mesh(cf, smFront));
+      g.scale.set(sd, 1, 1);
+      g.visible = false;
+      kit.group.add(g);
+      return g;
+    });
+
+    // ---- lyric type: one block at a time, low centre ----
+    const LOW = { d: 5, az: 0, y: 0.3 };
+    const num = (ch, a, b) => kit.text(ch, { cap: 1.6, color: 'gold', times: [a], pop: true, dur: 0.1, out: b, outDur: 0.1, depthTest: false, at: LOW });
+    num('3', s.t3, s.t2 - 0.14); num('2', s.t2, s.t1 - 0.14); num('1', s.t1, s.tYou - 0.14);
+    kit.text('YOU WERE\nNEVER HERE', { cap: 0.82, color: 'cream', times: [s.tYou, s.tWere, s.tNever, s.tHere], out: 119.42, outDur: 0.15, depthTest: false, at: { d: 5, az: 0, y: 0.0 } });
     return s;
   },
   update(t, s, kit) {
-    const d = s.prof.d(t);
-    s.world.position.z = d;
-    const lit = t >= 112.62;
-    kit.fade(lit ? 1 - kit.sm(119.58, 119.95, t) : 0);
-    // lamps and pools
-    const on = [0, 0];
-    for (let j = 0; j < 2; j++) {
-      on[j] = t >= LON[j] && t < LOFF[j] ? 1 : 0;
-      setC(s.bulbs, j, on[j] ? PAL.cream : 0x0a0a0a);
-      setM(s.pools, j, 0, FLOOR + 0.02, LAMPZ[j], on[j], 1, on[j] * 1.5);
+    s.world.position.z = s.prof.d(Math.min(t, 119.4));
+    const showM = t < 119.4;
+    s.machine.visible = showM;
+    // smoke wipe
+    const kIn = kit.ease.out(lin(SMOKE_IN[0], SMOKE_IN[1], t)), kOut = kit.ease.in(lin(SMOKE_OUT[0], SMOKE_OUT[1], t));
+    const k = kIn * (1 - kOut);
+    for (let i = 0; i < 2; i++) {
+      const sd = i ? 1 : -1, g = s.clouds[i];
+      g.visible = k > 0.001;
+      const g1 = 0.5 + 0.5 * k; // the puffs billow up as they roll in (less sideways speed)
+      g.position.set(sd * (10.2 - 7.0 * k), 1.4 + 0.6 * (1 - k), -3.4);
+      g.scale.set(sd * g1, g1, 1);
+      g.rotation.z = -sd * (t - 119) * 0.5;
     }
-    s.bulbs.instanceColor.needsUpdate = true; s.pools.instanceMatrix.needsUpdate = true;
-    // the machine: eyes on at "one", slot pulses while it runs
-    const eyes = t >= EYES_ON && t < EYES_OFF;
-    const run = t >= RUN && t < EYES_OFF;
-    for (let j = 0; j < 2; j++) { if (eyes) mixC(s.eyes, j, PAL.cyan, PAL.white, envAt(t, EYES_ON, 5)); else setC(s.eyes, j, PAL.petrolDeep); }
-    if (run) mixC(s.eyes, 2, PAL.teal, PAL.cyan, 0.4 + 0.6 * kit.beatEnv(t, 6)); else setC(s.eyes, 2, eyes ? PAL.teal : PAL.petrolDeep);
-    s.eyes.instanceColor.needsUpdate = true;
+    if (!showM) return;
 
-    // drawers: matrices only while any drawer still moves (pure: recomputed from t on every seek)
-    const moving = t < 116.1;
-    if (moving || !s.settled) {
-      for (let i = 0; i < s.ND; i++) {
-        const ts = s.dSlam[i], sd = s.dx[i];
-        const open = t < ts ? s.dOpen[i] : s.dOpen[i] * Math.max(0, 1 - (t - ts) / 0.08);
-        setM(s.front, i, sd * (FACEX - open - 0.05), s.dy[i], s.dz[i]);
-        setM(s.body, i, sd * (FACEX - open + 0.5), s.dy[i], s.dz[i]);
-      }
-      s.front.instanceMatrix.needsUpdate = true; s.body.instanceMatrix.needsUpdate = true;
-      s.settled = !moving;
+    const wake = kit.sm(112.18, 112.62, t);
+    if (!s.rim0) s.rim0 = s.mats.map((m) => (m.uniforms.uRimAmt ? m.uniforms.uRimAmt.value : 0));
+    s.mats.forEach((m, i) => { m.uniforms.uBright.value = 0.05 + 0.95 * wake; if (m.uniforms.uRimAmt) m.uniforms.uRimAmt.value = s.rim0[i] * wake; });
+    // reels: 3 deg/s while the tape runs; after "here" they break loose and drift outward, away from you
+    for (let i = 0; i < 2; i++) {
+      const Rl = s.reels[i], side = i ? 1 : -1, a = t - s.tHere;
+      const fly = kit.sm(s.tHere, s.tHere + 0.6, t);   // 3 m outward and away, at the sides
+      Rl.g.position.copy(Rl.base).addScaledVector(Rl.out, 3 * fly);
+      Rl.spin.rotation.z = -(t - 112.04) * 0.05 - (a > 0 ? 0.9 * a * a : 0) * side;
     }
-    for (let i = 0; i < s.ND; i++) {
-      const z = s.dz[i];
-      let litD = 0;
-      for (let j = 0; j < 2; j++) if (on[j] && Math.abs(z - LAMPZ[j]) < 7.5) litD = 1;
-      const kick = envAt(t, s.dSlam[i], 8);
-      if (kick > 0.04) mixC(s.front, i, litD ? PAL.teal : PAL.petrol, PAL.cyan, kick);
-      else setC(s.front, i, litD ? PAL.teal : PAL.petrol, litD ? 0.55 : 0.8);
+    // VU needles bounce on the beats until "here", then drop to the stop
+    for (let i = 0; i < 2; i++) {
+      const nv = (tt) => (tt < 112.3 ? 0 : Math.min(1, 0.3 + 0.62 * kit.beatEnv(tt, 4.5) * (0.75 + 0.25 * Math.sin(tt * 5.3 + i * 2.1)) + 0.1 * Math.sin(tt * 9.1 + i)));
+      const v = t < s.tHere ? nv(t) : nv(s.tHere) * (1 - kit.ease.out(lin(s.tHere, s.tHere + 0.35, t)));
+      const ang = -0.87 + 1.6 * v;
+      setM(s.needles, i, (i ? 1 : -1) * MX, MY - 0.6, PZ + 0.06, 1, 1, 1, 0, 0, -ang);
     }
-    s.front.instanceColor.needsUpdate = true;
+    s.needles.instanceMatrix.needsUpdate = true;
+    // warning lamps: lit, then out one per number (a white pop as each goes)
+    const tOff = [s.t3, s.t2, s.t1];
+    for (let i = 0; i < 3; i++) {
+      const lit = t >= 112.45 && t < tOff[i];
+      if (lit) setC(s.jewels, i, 0xffffff); else if (t >= tOff[i]) mixC(s.jewels, i, 0x1c1c1c, 0xffffff, envAt(t, tOff[i], 9) * 0.8); else setC(s.jewels, i, 0x1c1c1c);
+      const h = lit ? 1 + 0.06 * kit.beatEnv(t, 6) : 0.0001;
+      setM(s.halos, i, LAMP_X[i], LAMP_YS[i], PZ + 0.025, h, h, 1);
+    }
+    s.jewels.instanceColor.needsUpdate = true; s.halos.instanceMatrix.needsUpdate = true;
 
-    // dossier: hangs over the mouth, fed in while the machine runs, gone on "you were never here"
-    let yb;
-    const Y0 = FLOOR + SHH + 0.9;
-    if (t < RUN) yb = Y0;
-    else if (t < 117.74) yb = Y0 - 6 * kit.ease.inOut(lin(RUN, 117.74, t));
-    else yb = Y0 - 6 - 11 * kit.ease.in(lin(117.74, 118.05, t));
-    s.dos.position.y = yb;
-    s.dos.visible = t < 118.05;
-    s.paperMat.uniforms.uBright.value = 0.55 + 0.35 * (eyes ? 1 : 0) + 0.15 * on[1];
-
-    // "here": the strips drop away
-    for (const st of s.strips) {
-      const m = st.T.mesh, a = Math.max(0, t - 118.54 - st.delay);
-      m.position.y = st.y - 9 * a * a;
-      m.position.x = st.dx * a;
-      m.rotation.z = st.rz * a * 2;
+    // tape: runs 1 m/s (moving splice marks), glows at the head on "one", burns from "you", snaps on "never"
+    const glow0 = 1 - lin(112.3, 112.8, t);
+    for (let i = 0; i < s.seg.length; i++) {
+      const g = s.seg[i], tIg = s.tYou + g.dist / VB;
+      const stripe = ((((g.s - (t - 112.04)) % 1.6) + 1.6) % 1.6) < 0.22;
+      if (t >= tIg) mixC(s.tape, i, PAL.orange, 0x140a06, lin(tIg + 0.05, tIg + 0.4, t));
+      else if (t >= s.t1) mixC(s.tape, i, stripe ? PAL.brassDark : PAL.brass, PAL.orange, clamp01(1 - g.dist / 1.5) * lin(s.t1, s.t1 + 0.5, t));
+      else if (glow0 > 0) mixC(s.tape, i, PAL.brass, PAL.goldHi, glow0);
+      else setC(s.tape, i, stripe ? PAL.brassDark : PAL.brass);
+      _p.copy(g.p);
+      let sc = g.len;
+      _q.copy(g.q);
+      const a = t - s.tNever - g.delay;
+      if (a > 0) { _p.y -= 5.5 * a * a; _p.x *= 1 + 0.1 * a; _e.set(0, 0, g.spin * a); _q.multiply(_q2.setFromEuler(_e)); if (a > 1.0) sc = 0; }
+      setMQ(s.tape, i, _p, _q, sc, 1, 1);
     }
+    s.tape.instanceMatrix.needsUpdate = true; s.tape.instanceColor.needsUpdate = true;
+    // flames (pure in t): rise in 0.09 s, burn 0.3 s, die by 0.6 s after the front passes
+    for (let j = 0; j < s.NF; j++) {
+      const g = s.seg[Math.min(s.seg.length - 1, j * 2 + 1)], a = t - (s.tYou + g.dist / VB);
+      let h = 0;
+      if (a > 0 && a < 0.6) h = kit.ease.out(clamp01(a / 0.09)) * (1 - kit.sm(0.3, 0.6, a)) * (0.8 + 0.2 * Math.sin(t * 27 + j * 1.9));
+      if (h < 0.01) { setM(s.flA, j, 0, -50, 0, 0, 0, 0); setM(s.flB, j, 0, -50, 0, 0, 0, 0); continue; }
+      const ry = Math.atan2(EYE.x - g.p.x, EYE.z - g.p.z - s.world.position.z);
+      setM(s.flA, j, g.p.x, g.p.y + 0.12, g.p.z, 0.8 + 0.2 * h, h, 1, 0, ry, 0);
+      setM(s.flB, j, g.p.x + Math.sin(ry) * 0.04, g.p.y + 0.12, g.p.z + Math.cos(ry) * 0.04, 0.8 + 0.2 * h, h, 1, 0, ry, 0);
+    }
+    s.flA.instanceMatrix.needsUpdate = true; s.flB.instanceMatrix.needsUpdate = true;
   },
   events() {
     return [
-      { t: 112.62, sfx: 'shutter', gain: 0.75, haptic: [0.5, 60] },
-      { t: 114.6, sfx: 'shutter', gain: 0.6, haptic: [0.35, 50] },
-      { t: 115.9, sfx: 'switch', gain: 0.6 },
-      { t: 116.59, sfx: 'motor', gain: 0.55 },
-      { t: 117.74, sfx: 'whoosh', gain: 0.6, haptic: [0.3, 80] },
+      { t: 114.29, sfx: 'switch', gain: 0.55, haptic: [0.3, 40] }, // = corrected word times (sung())
+      { t: 116.56, sfx: 'switch', gain: 0.6, haptic: [0.35, 50] },
+      { t: 117.74, sfx: 'crack', gain: 0.5, haptic: [0.4, 90] },
+      { t: SMOKE_IN[0], sfx: 'whoosh', gain: 0.5 },
     ];
   },
 };
 
 // =================================================================================================
-// S15 Inside the scope (119.98 to 127.62, cold)
-// SHOT: hero = the round-cornered phosphor screen filling the front (teal field) with ONE black agent
-// silhouette standing in it. Supports: the cyan erase bar, the black tube funnel around (cyan rim).
-// Motion: the bar wipes figure and words left to right after "here"; then the CRT switch-off:
-// the screen squashes into a white line on "lights", into a dot on "out" (S16's sun bursts from it).
-// Lyric: one block, low centre on the screen's lower field.
-const AZH = 0.9;            // rad for u = +-1
-const EL0 = 14 * D2R;       // screen centre elevation (the dot, and S16's sun, sit here)
-const ELH = 0.5;            // rad for v = +-1
-const RS = 25;              // screen radius (from the eye)
-const NECK = new THREE.Vector3(0, 3.0, 30); // eye-relative tube axis
-const WIPE0 = 123.05, WIPE1 = 123.65;
-const CE = Math.cos(EL0), SE = Math.sin(EL0);
-
-const ROT_GLSL = /* glsl */ `
-  float cs = ${f(CE)}, sn = ${f(SE)};
-  vec3 d = vec3(d0.x, d0.y * cs + d0.z * sn, -d0.y * sn + d0.z * cs);
-  float az = atan(d.x, -d.z);
-  float el = asin(clamp(d.y, -1.0, 1.0));
-  float u = az / ${f(AZH)}, v = el / ${f(ELH)};`;
-const SCREEN_V = /* glsl */ `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const SCREEN_F = /* glsl */ `
-uniform float uGrat, uSqV, uSqU, uLine, uDot, uErase, uBar, uFade, uSceneFade;
-uniform vec3 uGC;
-varying vec3 vP;
-void main() {
-  vec3 d0 = normalize(vP);
-  ${ROT_GLSL}
-  float sv = max(1.0 - uSqV, 0.001), su = max(1.0 - uSqU, 0.001);
-  float uu = u / su, vv = v / sv;
-  float inside = step(pow(abs(uu), 4.0) + pow(abs(vv), 4.0), 1.0);
-  vec3 c = uGC * inside * uGrat;
-  float bar = (1.0 - step(0.035, abs(u - uErase))) * inside * uBar;
-  c = mix(c, vec3(0.75, 1.0, 1.0), bar);
-  float hh = max(sv * ${f(ELH)}, 0.0035), hw = max(su * ${f(AZH)}, 0.0035);
-  float band = step(abs(el), hh) * step(abs(az), hw) * uLine;
-  float dotm = step(length(vec2(az, el)), uDot);
-  c = mix(c, vec3(1.0), max(band, dotm));
-  gl_FragColor = vec4(c * uFade * uSceneFade, 1.0);
-  #include <colorspace_fragment>
-}`;
-// the agent silhouette: black, discarded where the erase bar has already passed
-const FIG_V = /* glsl */ `varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
-const FIG_F = /* glsl */ `
-uniform float uErase; uniform vec3 uEye;
-varying vec3 vW;
-void main() {
-  vec3 d0 = normalize(vW - uEye);
-  ${ROT_GLSL}
-  if (u < uErase) discard;
-  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-}`;
-const capPt = (azD, elD, r) => { const a = azD * D2R, e = elD * D2R; return new THREE.Vector3(Math.sin(a) * Math.cos(e) * r, Math.sin(e) * r, -Math.cos(a) * Math.cos(e) * r); };
-const eraseAt = (t) => -1.15 + 2.3 * ((k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2))(lin(WIPE0, WIPE1, t));
+// S15 The cameras go dark (119.70 to 127.62, cold)
+// SHOT: hero = a curved wall of 21 old CRT security monitors (3 rows x 7, R 7 m, -72..+72 deg), each a
+// deep bevelled case with a tapered tube housing and knobs, screens glowing cyan with camera pictures
+// (vault door, chessboard, phone booth, mirror corridor). The big centre monitor shows her standing in
+// an empty room. Supports: black rack uprights and shelves, cable looms rising into the dark overhead.
+// Motion: one row goes black per number (picture -> line -> black, left to right); "you" she turns to
+// the camera, "were never here" she fades out of the picture; "lights" the centre tube collapses to a
+// line, then to a dot at 14 deg straight ahead, which S16's sun bursts from (match cut).
+// Lyric: one block at a time, low centre (d 5) below the bottom row.
+const ROW_Y = [0.8, 3.0, 5.2];             // bottom, middle, top
+const MR = 7.0, MSTEP = 24 * D2R, CR = 6.3, CS = 1.5;
+const EL_DOT = 14 * D2R, DOT_D = 6.2;
 
 export const S15 = {
-  id: 'S15', t0: 119.98, t1: 127.62, world: 'cold', pre: 0, post: 0,
-  key: [0.0, 0.25, 0.97],
+  id: 'S15', t0: 119.70, t1: 127.62, world: 'cold', pre: 0.32, post: 0,
+  key: [0.25, 0.75, 0.6],
+  fog: { color: 0x000000, near: 18, far: 60 },
   sky: 'black',
   build(kit) {
-    const s = {};
-    const tube = (s.tube = new THREE.Group());
-    tube.position.copy(EYE);
-    kit.group.add(tube);
-    // the concave phosphor screen (spherical cap around the eye, front 200 deg)
-    s.su = {
-      uGrat: { value: 0 }, uSqV: { value: 0 }, uSqU: { value: 0 }, uLine: { value: 0 }, uDot: { value: 0 }, uErase: { value: -2 }, uBar: { value: 0 },
-      uGC: { value: new THREE.Color(PAL.teal) }, uFade: kit.U.uFade, uSceneFade: kit.SU.uSceneFade,
-    };
-    const scr = new THREE.Mesh(
-      new THREE.SphereGeometry(RS, 64, 24, 1.5 * Math.PI - 100 * D2R, 200 * D2R, 45 * D2R, 75 * D2R),
-      new THREE.ShaderMaterial({ uniforms: s.su, vertexShader: SCREEN_V, fragmentShader: SCREEN_F, side: THREE.DoubleSide }),
-    );
-    scr.name = 's15-screen'; scr.frustumCulled = false;
-    tube.add(scr);
+    const s = { mats: [] };
+    s.R3 = sung(kit, 'three two one', 119.95);
+    s.Y = sung(kit, 'you were never here', 123.15);
+    s.L = sung(kit, 'lights out', 125.7);
+    const root = (s.root = new THREE.Group());
+    kit.group.add(root);
+    const tn = (o) => { const m = kit.toon(o); s.mats.push(m); return m; };
+    const R = kit.rnd(1515);
+    root.add(new THREE.Mesh(new THREE.PlaneGeometry(60, 60).rotateX(-Math.PI / 2).translate(0, -0.45, 0), kit.flat({ color: PAL.black, fog: 0 })));
 
-    // the agent (fedora, trench coat): one black shape standing in the screen, 17 m tall at 21 m
-    const agent = mirrorOutline([[-0.06, 2.3], [-0.12, 0], [-0.85, 0], [-0.8, 2.4], [-1.55, 2.7], [-1.25, 5.4], [-1.45, 6.5], [-1.15, 7.15], [-0.42, 7.45], [-0.36, 7.75], [-0.52, 7.95], [-0.52, 8.55], [-1.2, 8.6], [-1.2, 8.82], [-0.52, 8.9], [-0.45, 9.55], [0, 9.62]]);
-    s.fu = { uErase: s.su.uErase, uEye: { value: EYE.clone() } };
-    s.fig = new THREE.Mesh(shapeGeo(agent, 1.7), new THREE.ShaderMaterial({ uniforms: s.fu, vertexShader: FIG_V, fragmentShader: FIG_F, side: THREE.DoubleSide }));
-    s.fig.position.set(0, 0.4, -21);
-    s.fig.frustumCulled = false; s.fig.name = 's15-agent';
-    tube.add(s.fig);
-
-    // the funnel: loft from the screen's rim back past the player to the neck (black, cyan rim only)
-    const N = 64, rim = [];
-    for (let i = 0; i < 16; i++) rim.push(capPt(-100 + (200 * i) / 16, 45, RS));
-    for (let i = 0; i < 16; i++) rim.push(capPt(100, 45 - (75 * i) / 16, RS));
-    for (let i = 0; i < 16; i++) rim.push(capPt(100 - (200 * i) / 16, -30, RS));
-    for (let i = 0; i < 16; i++) rim.push(capPt(-100, -30 + (75 * i) / 16, RS));
-    const neck = rim.map((p) => { const a = Math.atan2(p.y - NECK.y, p.x); return new THREE.Vector3(Math.cos(a) * 2.5, NECK.y + Math.sin(a) * 2.5, NECK.z); });
-    const RINGS = 6, ring = (j) => rim.map((p, i) => p.clone().lerp(neck[i], Math.pow(j / RINGS, 0.85)));
-    const P = [];
-    let prev = ring(0);
-    for (let j = 1; j <= RINGS; j++) {
-      const cur = ring(j);
-      for (let i = 0; i < N; i++) {
-        const a0 = prev[i], a1 = prev[(i + 1) % N], b0 = cur[i], b1 = cur[(i + 1) % N];
-        P.push(a0.x, a0.y, a0.z, b0.x, b0.y, b0.z, a1.x, a1.y, a1.z, a1.x, a1.y, a1.z, b0.x, b0.y, b0.z, b1.x, b1.y, b1.z);
-      }
-      prev = cur;
+    const G = monitorGeos();
+    s.mons = [];
+    const rowOff = [s.R3[2], s.R3[1], s.R3[0]]; // bottom goes on "one", middle on "two", top on "three"
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 7; c++) {
+      const centre = r === 1 && c === 3;
+      const az = (c - 3) * MSTEP, d = centre ? CR : MR, y = ROW_Y[r], sc = centre ? CS : 1;
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.atan2(y - EYE.y, d) * 0.85, -az, 0, 'YXZ'));
+      const pos = new THREE.Vector3(EYE.x + Math.sin(az) * d, y, EYE.z - Math.cos(az) * d);
+      const m = new THREE.Matrix4().compose(pos, q, new THREE.Vector3(sc, sc, sc));
+      const local = (x, yy, z) => new THREE.Vector3(x, yy, z).applyMatrix4(m);
+      s.mons.push({
+        m, q, sc, centre, r, c, pos,
+        tOff: centre ? s.L[0] : rowOff[r] + c * 0.05,
+        lp: local(0, MON.scy, 0.02), pp: local(0, MON.scy, 0.034),
+        base: new THREE.Color(PAL.teal).lerp(new THREE.Color(PAL.cyan), centre ? 0.85 : 0.3 + 0.45 * R()),
+        type: centre ? -1 : (c + r * 2) % 4, flip: (c + r) & 1 ? -1 : 1,
+      });
     }
-    const fg = new THREE.BufferGeometry();
-    fg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
-    fg.computeVertexNormals();
-    const nk = new THREE.CylinderGeometry(2.5, 2.5, 13, 16, 1, true); nk.rotateX(Math.PI / 2); nk.translate(0, NECK.y, NECK.z + 6.5);
-    const cap = new THREE.CircleGeometry(2.5, 16); cap.rotateY(Math.PI); cap.translate(0, NECK.y, NECK.z + 13);
-    s.walls = new THREE.Mesh(mergeSimple([fg, nk.toNonIndexed(), cap.toNonIndexed()]), kit.toon({ ramp: 'black', rim: PAL.petrol, rimAmt: 0.5, side: THREE.DoubleSide }));
-    s.walls.frustumCulled = false;
-    // Leo 07.11.: no frame around the player. The funnel's lit rim curved under and around the
-    // player like a cockpit edge, so the funnel is built but not drawn: only the screen stays.
-    s.walls.visible = false;
-    tube.add(s.walls);
-
-    // lyric type: one block, low centre on the screen's lower field
-    s.ywnh = kit.text('YOU WERE NEVER HERE', { cap: 0.95, color: 'cream', near: 119.56, at: { d: 6, az: 0, y: 0.55 } });
-    const tt = s.ywnh.times.slice(); tt[0] = 119.98; s.ywnh.setTimes(tt);
-    // each word goes when the erase bar passes it
-    for (let i = 0; i < s.ywnh.words.length; i++) {
-      const W = s.ywnh.words[i], uw = Math.atan2((W.x0 + W.x1) / 2, 6) / AZH;
-      let tw = WIPE1;
-      for (let q = 0; q <= 120; q++) { const tq = WIPE0 + ((WIPE1 - WIPE0) * q) / 120; if (eraseAt(tq) >= uw) { tw = tq; break; } }
-      s.ywnh.hideWord(i, tw);
+    const N = s.mons.length;
+    s.cases = inst(G.caseGeo, tn({ ramp: [PAL.black, PAL.petrol, PAL.teal], rim: PAL.cyan, rimAmt: 0.95, th: [0.05, 0.72] }), N, 's15-cases') // Round 4: lit cases, so every feed has a clear frame;
+    s.recess = inst(G.recess, kit.flat({ color: 0x010405, fog: 0.2 }), N, 's15-glass');
+    s.mons.forEach((M, i) => { s.cases.setMatrixAt(i, M.m); s.recess.setMatrixAt(i, M.m); });
+    s.light = initColors(inst(G.light, kit.flat({ color: PAL.white, fog: 0.15 }), N, 's15-screens'), N);
+    root.add(s.cases, s.recess, s.light);
+    // camera pictures (dark shapes on the lit screens), one instanced mesh per picture
+    const picGeos = [picVault(), picChess(), picBooth(), picCorridor()];
+    s.pics = picGeos.map((g, k) => {
+      const list = s.mons.filter((M) => M.type === k);
+      const mesh = inst(g, kit.flat({ color: PAL.petrolDeep, fog: 0.15 }), list.length, 's15-pic' + k);
+      root.add(mesh);
+      return { mesh, list };
+    });
+    // rack: uprights between the columns, a shelf under every monitor, cable looms into the dark
+    const rack = [];
+    for (let c = 0; c < 8; c++) {
+      const az = (c - 3.5) * MSTEP;
+      rack.push(xf(extrude(roundRect(0.38, 7.6, 0.08), 0.5, 0.05, 4), Math.sin(az) * (MR + 0.9), 3.35, EYE.z - Math.cos(az) * (MR + 0.9), 0, -az, 0));
     }
-    s.lo = kit.text('LIGHTS OUT', { cap: 1.3, color: 'gold', near: 124.94, out: 127.1, outDur: 0.01, at: { d: 6, az: 0, y: 0.55 } });
+    for (const M of s.mons) rack.push(xf(extrude(roundRect(2.9, 0.16, 0.05), 2.3, 0.03, 3), 0, -1.2, 0.12).applyMatrix4(M.m));
+    root.add(new THREE.Mesh(merge(rack), tn({ ramp: [PAL.black, PAL.black, PAL.petrolDeep], rim: PAL.teal, rimAmt: 0.6 })));
+    const looms = [];
+    for (const M of s.mons) {
+      if (M.r !== 2) continue;
+      const a = new THREE.Vector3(0, 0.7, -1.9).applyMatrix4(M.m);
+      looms.push(tube([a, new THREE.Vector3(a.x * 0.9, a.y + 2.6, a.z * 0.9 - 0.4), new THREE.Vector3(a.x * 0.55, 10.5, a.z * 0.55 - 1.0), new THREE.Vector3(a.x * 0.2, 15, a.z * 0.2 - 1.5)], 0.2, 14, 6));
+    }
+    root.add(new THREE.Mesh(merge(looms), tn({ ramp: [PAL.black, PAL.black, PAL.petrolDeep], rim: PAL.petrol, rimAmt: 0.8 })));
+
+    // the centre camera: her in an empty room (profile, then she turns to the camera and fades)
+    const C = s.mons.find((M) => M.centre);
+    s.ci = s.mons.indexOf(C);
+    const cg = (s.cg = new THREE.Group());
+    C.m.decompose(cg.position, cg.quaternion, cg.scale);
+    root.add(cg);
+    s.room = new THREE.Mesh(picRoom().translate(0, MON.scy, 0.034), kit.flat({ color: PAL.petrolDeep, fog: 0.15 }));
+    cg.add(s.room);
+    const herM = (geo) => { const h = initColors(inst(geo, kit.flat({ color: PAL.white, fog: 0.15 }), 1), 1, PAL.black); setM(h, 0, 0.1, MON.scy - 0.56, 0.04, 1.05, 1.05, 1); cg.add(h); return h; };
+    s.herP = herM(herProfile());
+    s.herF = herM(herFront());
+    const gl = merge([-1, 1].map((sd) => new THREE.CircleGeometry(0.03, 12).translate(sd * 0.036, 0.925, 0)));
+    s.glasses = herM(gl);
+    setM(s.glasses, 0, 0.1, MON.scy - 0.56, 0.045, 1.05, 1.05, 1);
+    // the last dot (S16's sun bursts from it)
+    s.dot = new THREE.Mesh(new THREE.CircleGeometry(1, 28), kit.flat({ color: PAL.white, fog: 0 }));
+    s.dot.position.set(EYE.x, EYE.y + Math.sin(EL_DOT) * DOT_D, EYE.z - Math.cos(EL_DOT) * DOT_D);
+    s.dot.lookAt(EYE);
+    s.dotMat = s.dot.material;
+    root.add(s.dot);
+
+    // ---- lyric type: low centre under the bottom row ----
+    const LOW = { d: 5, az: 0, y: -0.55 };
+    const num = (ch, a, b) => kit.text(ch, { cap: 1.5, color: 'gold', times: [a], pop: true, dur: 0.1, out: b, outDur: 0.1, depthTest: false, at: LOW });
+    num('3', s.R3[0], s.R3[1] - 0.14); num('2', s.R3[1], s.R3[2] - 0.14); num('1', s.R3[2], s.Y[0] - 0.14);
+    kit.text('YOU WERE\nNEVER HERE', { cap: 0.8, color: 'cream', times: s.Y, out: s.L[0] - 0.3, outDur: 0.2, depthTest: false, at: LOW });
+    kit.text('LIGHTS OUT', { cap: 1.1, color: 'gold', times: s.L, out: 127.3, outDur: 0.15, depthTest: false, at: LOW });
     return s;
   },
   update(t, s, kit) {
-    const su = s.su;
-    // power on at the downbeat, then the phosphor fades a little after the wipe
-    let g = t < 120.08 ? 0.5 : 1;
-    g *= t < 123.75 ? 1 : t < 124.2 ? 0.8 : 0.62;
-    if (t < 123.0) g *= 1 + 0.25 * kit.downEnv(t, 5);
-    su.uGrat.value = g;
-    su.uSqV.value = kit.sm(124.94, 125.34, t);
-    su.uSqU.value = kit.sm(126.38, 126.5, t);
-    su.uLine.value = kit.sm(125.2, 125.34, t);
-    su.uDot.value = t >= 126.5 ? 0.0035 + 0.0135 * kit.sm(126.91, 127.62, t) : 0;
-    su.uErase.value = t < WIPE0 ? -2 : eraseAt(t);
-    su.uBar.value = t >= WIPE0 && t < WIPE1 + 0.05 ? 1 : 0;
-    s.fig.visible = t < WIPE1 + 0.05;
-    // "out": a designed black beat (only LIGHTS OUT and the dot); the funnel is not drawn
-    // LIGHTS OUT squashes flat after "out"
-    const m = s.lo.mesh;
-    m.scale.y = 1 - 0.97 * kit.sm(126.9, 127.02, t);
-    m.scale.x = 1 - 0.98 * kit.sm(127.02, 127.1, t);
+    s.root.visible = t >= 119.4;
+    if (!s.root.visible) return;
+    const dim = 1 - 0.72 * kit.sm(s.L[0], s.L[0] + 0.7, t);
+    for (const m of s.mats) m.uniforms.uBright.value = dim;
+    // screens: picture -> white line -> black, per monitor
+    for (let i = 0; i < s.mons.length; i++) {
+      const M = s.mons[i], T = M.tOff;
+      const yDur = M.centre ? 0.12 : 0.07, xDur = M.centre ? 0.2 : 0.09;
+      let sx = 1, sy = 1, k1 = 0, on = true;
+      if (t >= T) {
+        k1 = lin(T, T + yDur, t);
+        sy = 1 - 0.975 * k1;
+        sx = 1 - 0.985 * lin(T + yDur, T + yDur + xDur, t);
+        on = t < T + yDur + xDur;
+      }
+      M.vis = t < T;
+      mixC(s.light, i, M.base.getHex(), PAL.white, k1);
+      setMQ(s.light, i, M.lp, M.q, on ? sx * M.sc : 0, on ? sy * M.sc : 0, M.sc);
+    }
+    s.light.instanceMatrix.needsUpdate = true; s.light.instanceColor.needsUpdate = true;
+    for (const P of s.pics) {
+      P.list.forEach((M, j) => setMQ(P.mesh, j, M.pp, M.q, M.vis ? M.sc * M.flip : 0, M.vis ? M.sc : 0, M.sc));
+      P.mesh.instanceMatrix.needsUpdate = true;
+    }
+    // her: profile, turns on "you", fades on "were never here"; the room stays empty
+    const C = s.mons[s.ci], cv = C.vis;
+    s.room.visible = cv;
+    const turned = t >= s.Y[0], fade = lin(s.Y[1], s.Y[3], t);
+    s.herP.visible = cv && !turned;
+    s.herF.visible = cv && turned && fade < 1;
+    s.glasses.visible = s.herF.visible;
+    mixC(s.herF, 0, PAL.black, C.base.getHex(), fade);
+    mixC(s.glasses, 0, PAL.white, C.base.getHex(), Math.max(fade, 0.6 - 0.6 * envAt(t, s.Y[0], 3)));
+    s.herF.instanceColor.needsUpdate = true; s.glasses.instanceColor.needsUpdate = true;
+    // the dot: holds at 14 deg, swells to S16's first sun size, warms to amber
+    const tDot = s.L[0] + 0.3;
+    s.dot.visible = t >= tDot;
+    const rr = 0.0035 + 0.0135 * kit.sm(126.91, 127.62, t);
+    s.dot.scale.setScalar(Math.tan(rr) * DOT_D);
+    s.dotMat.uniforms.uColor.value.copy(C_WHITE).lerp(C_AMBER, lin(126.4, 127.55, t));
   },
   events() {
     return [
-      { t: 119.98, sfx: 'switch', gain: 0.45 },
-      { t: WIPE0, sfx: 'whoosh', gain: 0.4 },
-      { t: 124.94, sfx: 'switch', gain: 0.6, haptic: [0.3, 60] },
+      { t: 119.95, sfx: 'switch', gain: 0.45 },
+      { t: 122.27, sfx: 'switch', gain: 0.5, haptic: [0.25, 40] },
+      { t: 125.7, sfx: 'switch', gain: 0.6, haptic: [0.3, 60] },
       { t: 126.38, sfx: 'tick', gain: 0.55 },
     ];
   },
